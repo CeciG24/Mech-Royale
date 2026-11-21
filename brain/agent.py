@@ -517,12 +517,16 @@ class Agent:
             u = max(u, 0.5)
         return u
 
-    def _shot_clear(self, muzzle: np.ndarray, th: Threat) -> bool:
-        """u_obst test: a shot from our muzzle reaches the target's feet, torso or head."""
-        hs = (0.8, 1.75, 2.6) if th.id >= 100 else (2.0, 4.5, 7.5)
+    def _shot_point(self, muzzle: np.ndarray, th: Threat) -> Optional[np.ndarray]:
+        """Prefer the torso, then an exposed head or feet; return a point shots can reach."""
+        hs = (1.75, 2.6, 0.8) if th.id >= 100 else (4.5, 7.5, 2.0)
         B = np.array([th.pos + np.array([0.0, 0.0, h]) for h in hs])
         A = np.repeat(muzzle[None], len(hs), axis=0)
-        return bool(self.world.los_batch(A, B, step=2.0).any())
+        visible = np.flatnonzero(self.world.los_batch(A, B, step=2.0))
+        return B[int(visible[0])] if len(visible) else None
+
+    def _shot_clear(self, muzzle: np.ndarray, th: Threat) -> bool:
+        return self._shot_point(muzzle, th) is not None
 
     def select_target(self) -> Optional[Tuple[Threat, float, bool]]:
         """S(e) = u_hit + u_finish (1 - h_e) + u_duel [aims at me] - u_obst, 10% hysteresis.
@@ -1051,6 +1055,12 @@ class Agent:
     def weapon_choice(self, th: Threat, weapons, kinds, eye, d: float, short: bool, clear: bool = True):
         fire = [False, False]
         centre = (th.pos[0], th.pos[1], th.pos[2] + (1.75 if th.id >= 100 else 4.5))
+        if clear:
+            exposed = self._shot_point(np.asarray(eye, dtype=float), th)
+            if exposed is None:
+                clear = False
+            else:
+                centre = exposed
         me = self.me
         aim = list(yaw_pitch(eye, centre))
         if "lightning" in kinds and d <= 44 and me["energy"] >= 3 and clear:
