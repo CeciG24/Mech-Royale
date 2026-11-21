@@ -1,20 +1,22 @@
 # Mech Royale
 
-Candidato de práctica basado en `808e115286c5dfdde8dcca00dddc74e8af92e22f`.
-El usuario reporta 3.17 en la plataforma para esa referencia; este paquete conserva
-su estrategia. El experimental anterior obtuvo 2.37. Cinco variantes nuevas no
-superaron la referencia en 24 semillas locales y se descartaron.
+Estado de esta rama: **experimento sin mejora validada; main conserva el 3.17**.
+La referencia `59d32bc` obtuvo **3.17 oficial según el usuario**.
+Este candidato añade pistola simultánea cuando su aim ya está alineado,
+conservando el plan de láser/rayos. No tiene puntuación oficial nueva.
 
-Resultados y límites: [REVIEW.txt](REVIEW.txt), [EVALUATION.json](EVALUATION.json).
-Las puntuaciones locales no equivalen a las de las 48 semillas oficiales privadas.
+Se probaron seis variantes y dos candidatos en lotes de validación distintos.
+La corrección de celdas ganó entrenamiento y perdió en validación; se descartó.
+Disparo simultáneo en validación nueva: 2.688 frente a
+2.156 de la referencia. Las cifras locales no equivalen a las de la página.
 
-Con Python y el kit oficial disponible en `mechfight-kit/`:
+Resultados, commits, límites y reproducción: [REVIEW.txt](REVIEW.txt), [EVALUATION.json](EVALUATION.json).
+
+Con Python y Docker (kit incluido):
 
 ```sh
 python tools/retest.py --docker --check-only
-python tools/retest.py --docker
 ```
 
-El primer comando comprueba arranque, fallback y protocolo con los límites del juez.
-El segundo añade la evaluación local de práctica. No envía al leaderboard.
-El checker mide protocolo y latencia; no demuestra mejor placement.
+Comprueba protocolo, latencia, arranque y fallback con el perfil del juez.
+No envía al leaderboard.
