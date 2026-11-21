@@ -1,0 +1,573 @@
+{
+  "reference_sha": "fab08268806c7ec7c1122c71f5a1056944ffb890",
+  "previous_candidate_sha": "6d2ca74b560e35c6ed54719c7f52b3c55770faec",
+  "selected_policy_sha": "6eb8d8759bf0dd234999ff769c9b07a6b8a4228f",
+  "selection_criterion": "conservative validation, explicitly requested by user",
+  "selected_name": "referencia conservadora con arranque portable",
+  "leaderboard_id_reported": "BB-1F649929",
+  "leaderboard_score_reported": 2.67,
+  "leaderboard_commit_verified": false,
+  "primary_metric": "mean(16 - place)",
+  "training_seeds": [
+    301,
+    302,
+    303,
+    304,
+    305,
+    306,
+    307,
+    308,
+    309,
+    310,
+    311,
+    312
+  ],
+  "validation_seeds": [
+    401,
+    402,
+    403,
+    404,
+    405,
+    406,
+    407,
+    408,
+    409,
+    410,
+    411,
+    412
+  ],
+  "mixed_validation_seeds": [
+    501,
+    502,
+    503,
+    504
+  ],
+  "baseline": {
+    "sha": "fab08268806c7ec7c1122c71f5a1056944ffb890",
+    "seeds": "301,302,303,304,305,306,307,308,309,310,311,312",
+    "opp": "house",
+    "squad": true,
+    "mean_points": 1.5,
+    "late": 0,
+    "errors": 0,
+    "fallback_ticks": 0,
+    "fallback_init": 0,
+    "outside_ticks": 455,
+    "stalled_ticks": 91,
+    "max_act_p99_ms": 14.199843984097258
+  },
+  "previous_candidate": {
+    "sha": "6d2ca74b560e35c6ed54719c7f52b3c55770faec",
+    "seeds": "301,302,303,304,305,306,307,308,309,310,311,312",
+    "opp": "house",
+    "squad": true,
+    "mean_points": 0.5833333333333334,
+    "late": 1,
+    "errors": 0,
+    "fallback_ticks": 0,
+    "fallback_init": 0,
+    "outside_ticks": 762,
+    "stalled_ticks": 64,
+    "max_act_p99_ms": 6.45013788715005
+  },
+  "rounds": [
+    {
+      "round": 1,
+      "sha": "992be999e93705330463300ea69e144485fa2a9f",
+      "hypothesis": "Celdas: redondear despues de dividir por resolucion",
+      "compared_to": "6eb8d8759bf0dd234999ff769c9b07a6b8a4228f",
+      "mean_points": 2.3333333333333335,
+      "delta_previous_best": 0.8333333333333335,
+      "training_accept": true,
+      "docker_late": 0,
+      "docker_rtt_p99_ms": 10.8,
+      "sim_late": 0,
+      "sim_errors": 0,
+      "fallback_ticks": 0,
+      "stalled_ticks": 132,
+      "outside_ticks": 340,
+      "best_after_round": "992be999e93705330463300ea69e144485fa2a9f"
+    },
+    {
+      "round": 2,
+      "sha": "05586013dd0674b2b899152ac0ebed3be31760b0",
+      "hypothesis": "Recoger segundo arma durante un duelo",
+      "compared_to": "992be999e93705330463300ea69e144485fa2a9f",
+      "mean_points": 2.3333333333333335,
+      "delta_previous_best": 0.0,
+      "training_accept": false,
+      "docker_late": 0,
+      "docker_rtt_p99_ms": 13.2,
+      "sim_late": 0,
+      "sim_errors": 0,
+      "fallback_ticks": 0,
+      "stalled_ticks": 144,
+      "outside_ticks": 340,
+      "best_after_round": "992be999e93705330463300ea69e144485fa2a9f"
+    },
+    {
+      "round": 3,
+      "sha": "f91c5d228c9e3d7291c7d218a996ba3d0c99240c",
+      "hypothesis": "Suspender carga laser en rotacion urgente",
+      "compared_to": "992be999e93705330463300ea69e144485fa2a9f",
+      "mean_points": 2.1666666666666665,
+      "delta_previous_best": -0.16666666666666696,
+      "training_accept": false,
+      "docker_late": 0,
+      "docker_rtt_p99_ms": 8.8,
+      "sim_late": 0,
+      "sim_errors": 0,
+      "fallback_ticks": 0,
+      "stalled_ticks": 146,
+      "outside_ticks": 558,
+      "best_after_round": "992be999e93705330463300ea69e144485fa2a9f"
+    },
+    {
+      "round": 4,
+      "sha": "ad15fe51b86641acd81d534cd7e4e15fb430d7b4",
+      "hypothesis": "Apuntar a la parte expuesta del rival",
+      "compared_to": "992be999e93705330463300ea69e144485fa2a9f",
+      "mean_points": 3,
+      "delta_previous_best": 0.6666666666666665,
+      "training_accept": true,
+      "docker_late": 0,
+      "docker_rtt_p99_ms": 14.7,
+      "sim_late": 0,
+      "sim_errors": 0,
+      "fallback_ticks": 0,
+      "stalled_ticks": 148,
+      "outside_ticks": 667,
+      "best_after_round": "ad15fe51b86641acd81d534cd7e4e15fb430d7b4"
+    },
+    {
+      "round": 5,
+      "sha": "466afdca27b9c44c836bab8007f3385e5fc9da80",
+      "hypothesis": "Elegir una salida libre al desatascarse",
+      "compared_to": "ad15fe51b86641acd81d534cd7e4e15fb430d7b4",
+      "mean_points": 2.4166666666666665,
+      "delta_previous_best": -0.5833333333333335,
+      "training_accept": false,
+      "docker_late": 0,
+      "docker_rtt_p99_ms": 5.7,
+      "sim_late": 0,
+      "sim_errors": 0,
+      "fallback_ticks": 0,
+      "stalled_ticks": 114,
+      "outside_ticks": 449,
+      "best_after_round": "ad15fe51b86641acd81d534cd7e4e15fb430d7b4"
+    }
+  ],
+  "validation": {
+    "round4_squad": {
+      "reference_mean": 2.3333333333333335,
+      "candidate_mean": 2.5,
+      "reference_summary": {
+        "sha": "fab08268806c7ec7c1122c71f5a1056944ffb890",
+        "seeds": "401,402,403,404,405,406,407,408,409,410,411,412",
+        "opp": "house",
+        "squad": true,
+        "mean_points": 2.3333333333333335,
+        "late": 0,
+        "errors": 0,
+        "fallback_ticks": 0,
+        "fallback_init": 0,
+        "outside_ticks": 653,
+        "stalled_ticks": 102,
+        "max_act_p99_ms": 5.341349984519184
+      },
+      "candidate_summary": {
+        "sha": "ad15fe51b86641acd81d534cd7e4e15fb430d7b4",
+        "seeds": "401,402,403,404,405,406,407,408,409,410,411,412",
+        "opp": "house",
+        "squad": true,
+        "mean_points": 2.5,
+        "late": 0,
+        "errors": 0,
+        "fallback_ticks": 0,
+        "fallback_init": 0,
+        "outside_ticks": 617,
+        "stalled_ticks": 689,
+        "max_act_p99_ms": 4.547103934455661
+      },
+      "mean_delta": 0.16666666666666666,
+      "paired_bootstrap_95": [
+        -0.9166666666666666,
+        1.25
+      ],
+      "pairs": [
+        {
+          "seed": 401,
+          "base_points": 0,
+          "candidate_points": 0,
+          "delta": 0
+        },
+        {
+          "seed": 402,
+          "base_points": 11,
+          "candidate_points": 12,
+          "delta": 1
+        },
+        {
+          "seed": 403,
+          "base_points": 0,
+          "candidate_points": 0,
+          "delta": 0
+        },
+        {
+          "seed": 404,
+          "base_points": 0,
+          "candidate_points": 1,
+          "delta": 1
+        },
+        {
+          "seed": 405,
+          "base_points": 1,
+          "candidate_points": 2,
+          "delta": 1
+        },
+        {
+          "seed": 406,
+          "base_points": 3,
+          "candidate_points": 1,
+          "delta": -2
+        },
+        {
+          "seed": 407,
+          "base_points": 4,
+          "candidate_points": 8,
+          "delta": 4
+        },
+        {
+          "seed": 408,
+          "base_points": 0,
+          "candidate_points": 0,
+          "delta": 0
+        },
+        {
+          "seed": 409,
+          "base_points": 1,
+          "candidate_points": 3,
+          "delta": 2
+        },
+        {
+          "seed": 410,
+          "base_points": 3,
+          "candidate_points": 2,
+          "delta": -1
+        },
+        {
+          "seed": 411,
+          "base_points": 4,
+          "candidate_points": 0,
+          "delta": -4
+        },
+        {
+          "seed": 412,
+          "base_points": 1,
+          "candidate_points": 1,
+          "delta": 0
+        }
+      ]
+    },
+    "round4_mix": {
+      "reference_mean": 14,
+      "candidate_mean": 10,
+      "reference_summary": {
+        "sha": "fab08268806c7ec7c1122c71f5a1056944ffb890",
+        "seeds": "501,502,503,504",
+        "opp": "mix",
+        "squad": false,
+        "mean_points": 14,
+        "late": 0,
+        "errors": 0,
+        "fallback_ticks": 0,
+        "fallback_init": 0,
+        "outside_ticks": 180,
+        "stalled_ticks": 31,
+        "max_act_p99_ms": 3.130127983167768
+      },
+      "candidate_summary": {
+        "sha": "ad15fe51b86641acd81d534cd7e4e15fb430d7b4",
+        "seeds": "501,502,503,504",
+        "opp": "mix",
+        "squad": false,
+        "mean_points": 10,
+        "late": 0,
+        "errors": 0,
+        "fallback_ticks": 0,
+        "fallback_init": 0,
+        "outside_ticks": 151,
+        "stalled_ticks": 49,
+        "max_act_p99_ms": 3.5943119972944237
+      },
+      "mean_delta": -4,
+      "paired_bootstrap_95": [
+        -7.75,
+        -0.5
+      ],
+      "pairs": [
+        {
+          "seed": 501,
+          "base_points": 14,
+          "candidate_points": 4,
+          "delta": -10
+        },
+        {
+          "seed": 502,
+          "base_points": 14,
+          "candidate_points": 14,
+          "delta": 0
+        },
+        {
+          "seed": 503,
+          "base_points": 14,
+          "candidate_points": 13,
+          "delta": -1
+        },
+        {
+          "seed": 504,
+          "base_points": 14,
+          "candidate_points": 9,
+          "delta": -5
+        }
+      ]
+    },
+    "round1_squad": {
+      "reference_mean": 2.3333333333333335,
+      "candidate_mean": 2.5,
+      "reference_summary": {
+        "sha": "fab08268806c7ec7c1122c71f5a1056944ffb890",
+        "seeds": "401,402,403,404,405,406,407,408,409,410,411,412",
+        "opp": "house",
+        "squad": true,
+        "mean_points": 2.3333333333333335,
+        "late": 0,
+        "errors": 0,
+        "fallback_ticks": 0,
+        "fallback_init": 0,
+        "outside_ticks": 653,
+        "stalled_ticks": 102,
+        "max_act_p99_ms": 5.341349984519184
+      },
+      "candidate_summary": {
+        "sha": "992be999e93705330463300ea69e144485fa2a9f",
+        "seeds": "401,402,403,404,405,406,407,408,409,410,411,412",
+        "opp": "house",
+        "squad": true,
+        "mean_points": 2.5,
+        "late": 1,
+        "errors": 0,
+        "fallback_ticks": 0,
+        "fallback_init": 0,
+        "outside_ticks": 579,
+        "stalled_ticks": 114,
+        "max_act_p99_ms": 8.617477961815888
+      },
+      "mean_delta": 0.16666666666666666,
+      "paired_bootstrap_95": [
+        -2.3333333333333335,
+        2.6666666666666665
+      ],
+      "pairs": [
+        {
+          "seed": 401,
+          "base_points": 0,
+          "candidate_points": 0,
+          "delta": 0
+        },
+        {
+          "seed": 402,
+          "base_points": 11,
+          "candidate_points": 1,
+          "delta": -10
+        },
+        {
+          "seed": 403,
+          "base_points": 0,
+          "candidate_points": 0,
+          "delta": 0
+        },
+        {
+          "seed": 404,
+          "base_points": 0,
+          "candidate_points": 1,
+          "delta": 1
+        },
+        {
+          "seed": 405,
+          "base_points": 1,
+          "candidate_points": 2,
+          "delta": 1
+        },
+        {
+          "seed": 406,
+          "base_points": 3,
+          "candidate_points": 1,
+          "delta": -2
+        },
+        {
+          "seed": 407,
+          "base_points": 4,
+          "candidate_points": 8,
+          "delta": 4
+        },
+        {
+          "seed": 408,
+          "base_points": 0,
+          "candidate_points": 0,
+          "delta": 0
+        },
+        {
+          "seed": 409,
+          "base_points": 1,
+          "candidate_points": 3,
+          "delta": 2
+        },
+        {
+          "seed": 410,
+          "base_points": 3,
+          "candidate_points": 13,
+          "delta": 10
+        },
+        {
+          "seed": 411,
+          "base_points": 4,
+          "candidate_points": 1,
+          "delta": -3
+        },
+        {
+          "seed": 412,
+          "base_points": 1,
+          "candidate_points": 0,
+          "delta": -1
+        }
+      ]
+    },
+    "round1_mix": {
+      "reference_mean": 14,
+      "candidate_mean": 10,
+      "reference_summary": {
+        "sha": "fab08268806c7ec7c1122c71f5a1056944ffb890",
+        "seeds": "501,502,503,504",
+        "opp": "mix",
+        "squad": false,
+        "mean_points": 14,
+        "late": 0,
+        "errors": 0,
+        "fallback_ticks": 0,
+        "fallback_init": 0,
+        "outside_ticks": 180,
+        "stalled_ticks": 31,
+        "max_act_p99_ms": 3.130127983167768
+      },
+      "candidate_summary": {
+        "sha": "992be999e93705330463300ea69e144485fa2a9f",
+        "seeds": "501,502,503,504",
+        "opp": "mix",
+        "squad": false,
+        "mean_points": 10,
+        "late": 0,
+        "errors": 0,
+        "fallback_ticks": 0,
+        "fallback_init": 0,
+        "outside_ticks": 0,
+        "stalled_ticks": 58,
+        "max_act_p99_ms": 9.910200024023652
+      },
+      "mean_delta": -4,
+      "paired_bootstrap_95": [
+        -7.75,
+        -0.5
+      ],
+      "pairs": [
+        {
+          "seed": 501,
+          "base_points": 14,
+          "candidate_points": 4,
+          "delta": -10
+        },
+        {
+          "seed": 502,
+          "base_points": 14,
+          "candidate_points": 13,
+          "delta": -1
+        },
+        {
+          "seed": 503,
+          "base_points": 14,
+          "candidate_points": 14,
+          "delta": 0
+        },
+        {
+          "seed": 504,
+          "base_points": 14,
+          "candidate_points": 9,
+          "delta": -5
+        }
+      ]
+    }
+  },
+  "docker_limits_verified": {
+    "uid": 65534,
+    "python": "3.13.18",
+    "numpy": "2.4.3",
+    "cpu.max": "100000 100000",
+    "memory.max": "536870912",
+    "memory.swap.max": "0",
+    "pids.max": "128"
+  },
+  "checks": {
+    "reference": {
+      "passed": true,
+      "late": 0,
+      "p99_rtt_ms": 8.3,
+      "stale_dropped": 0,
+      "fallback_log": false
+    },
+    "round-1": {
+      "passed": true,
+      "late": 0,
+      "p99_rtt_ms": 10.8,
+      "stale_dropped": 0,
+      "fallback_log": false
+    },
+    "round-2": {
+      "passed": true,
+      "late": 0,
+      "p99_rtt_ms": 13.2,
+      "stale_dropped": 0,
+      "fallback_log": false
+    },
+    "round-3": {
+      "passed": true,
+      "late": 0,
+      "p99_rtt_ms": 8.8,
+      "stale_dropped": 0,
+      "fallback_log": false
+    },
+    "round-4": {
+      "passed": true,
+      "late": 0,
+      "p99_rtt_ms": 14.7,
+      "stale_dropped": 0,
+      "fallback_log": false
+    },
+    "round-5": {
+      "passed": true,
+      "late": 0,
+      "p99_rtt_ms": 5.7,
+      "stale_dropped": 1,
+      "fallback_log": false
+    }
+  },
+  "simulator": "unofficial local approximation; HouseBot squad and mixed FFA",
+  "placement_runtime": {
+    "python": "3.12.6",
+    "numpy": "2.2.2",
+    "jobs": 2
+  },
+  "policy_sha256": {
+    "bot.py": "69ad9af4a9d3ec93f75c5de6ee0966c4f7e5405fc487086f1328cfab99ee03b7",
+    "brain/agent.py": "41c4b9a28fde0afd0f0cb7e350a6429e7861fd59313d896f11369c431e9de43a"
+  }
+}
