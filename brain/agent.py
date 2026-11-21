@@ -269,6 +269,7 @@ class Agent:
         target = self.select_target()
         move, boost, jump = self.plan_move(obs, locks, incoming, target)
         aim, fire = self.plan_aim_fire(locks, target)
+        self.support_gun(target, fire)
         a.update(self.plan_take(obs, target))
         # proactive reload only with <= 4 rounds and nobody close (reload is heard at 60 m)
         gun = next((w for w in me["weapons"] if w and w["kind"] == "gun"), None)
@@ -1171,6 +1172,34 @@ class Agent:
             if t - b[2] < 4.0:
                 return [math.atan2(b[1] - y, b[0] - x), 0.0], [False, False]
         return self.scan(me), [False, False]
+
+    def support_gun(self, target, fire):
+        """Use the independent gun trigger when our current aim also hits its lead.
+
+        Preserve the primary weapon's aim and release/charge decision. A quiet
+        fire plan stays quiet; releasing an already charging laser is a shot.
+        """
+        weapons = self.me["weapons"]
+        charging = any(w and w["kind"] == "laser" and w.get("charge", 0) > 0 for w in weapons)
+        if target is None or not target[2] or not (any(fire) or charging):
+            return
+        slot = next((i for i, w in enumerate(weapons) if w and w["kind"] == "gun"), None)
+        if slot is None or fire[slot]:
+            return
+        w = weapons[slot]
+        if w.get("ammo", 0) <= 0 or w.get("reload", 0) > 0 or w.get("cooldown", 0) > 0:
+            return
+        th = target[0]
+        d = math.dist(th.pos[:2], self.pos[:2])
+        if d > w["stats"].get("range", 230.0):
+            return
+        eye = self.pos + np.array([0.0, 0.0, self.me["stats"].get("muzzle_height", 7.0)])
+        centre = (th.pos[0], th.pos[1], th.pos[2] + (1.75 if th.id >= 100 else 4.5))
+        aim = yaw_pitch(eye, lead(eye, centre, th.vel, w["stats"].get("speed", 252.0), 1.0))
+        actual = self.me["aim"]
+        err = abs(wrap(aim[0] - actual[0])) + abs(aim[1] - actual[1])
+        if err < max(0.01, math.atan2(self.P["aim_tol"], max(d, 1.0))):
+            fire[slot] = True
 
     def crate_shot(self, eye, enemies):
         """Offense: break the nearest visible crate (1 cube, 50% weapon) when no mech is close."""
