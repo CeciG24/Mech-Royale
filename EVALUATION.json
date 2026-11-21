@@ -396,5 +396,8 @@
     "tmp_mb": 64,
     "log": "evidence/dualfire-docker-check.log"
   },
-  "decision": "Keep official 3.17 on main; dualfire is experimental only"
+  "decision": "Promote the user-confirmed 3.33 dual-fire strategy to main; prior local uncertainty is retained as historical evidence.",
+  "official_candidate_score": 3.33,
+  "official_candidate_sha": "c0e261dde754a55c51ca5ed63a2e9339cfe2802f",
+  "official_candidate_score_source": "User confirmed in follow-up; not independently submitted by agent"
 }

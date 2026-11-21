@@ -1,16 +1,12 @@
 # Mech Royale
 
-Estado de esta rama: **experimento sin mejora validada; main conserva el 3.17**.
-La referencia `59d32bc` obtuvo **3.17 oficial según el usuario**.
-Este candidato añade pistola simultánea cuando su aim ya está alineado,
-conservando el plan de láser/rayos. No tiene puntuación oficial nueva.
+Versión de referencia: **3.33 oficial reportado por el usuario**, con la política
+publicada en `c0e261dde754a55c51ca5ed63a2e9339cfe2802f`.
+La pistola puede disparar simultáneamente al láser o los rayos cuando su aim ya
+está alineado. La estrategia anterior obtuvo 3.17.
 
-Se probaron seis variantes y dos candidatos en lotes de validación distintos.
-La corrección de celdas ganó entrenamiento y perdió en validación; se descartó.
-Disparo simultáneo en validación nueva: 2.688 frente a
-2.156 de la referencia. Las cifras locales no equivalen a las de la página.
-
-Resultados, commits, límites y reproducción: [REVIEW.txt](REVIEW.txt), [EVALUATION.json](EVALUATION.json).
+El resultado real confirma la mejora aunque las pruebas locales anteriores
+fueran inconclusas. Historial: [REVIEW.txt](REVIEW.txt), [EVALUATION.json](EVALUATION.json).
 
 Con Python y Docker (kit incluido):
 
@@ -18,5 +14,4 @@ Con Python y Docker (kit incluido):
 python tools/retest.py --docker --check-only
 ```
 
-Comprueba protocolo, latencia, arranque y fallback con el perfil del juez.
-No envía al leaderboard.
+El checker valida protocolo y latencia; no demuestra placement. No envía al leaderboard.

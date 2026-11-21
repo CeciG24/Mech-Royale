@@ -106,3 +106,7 @@ con recarga de energía por histéresis (no reactivar boost en cuanto cruza 30),
 manteniendo excepciones para salir de zona o esquivar un disparo inminente.
 Debe probarse como un cambio de estado aislado, con un nuevo lote y sin apilar
 los seis cambios. No seguir ajustando pesos para ganar estas mismas semillas.
+
+Actualización posterior: el usuario confirmó 3.33 oficial para la propuesta c0e261d.
+Se adopta esa política como nueva referencia y se promueve a main. Los resultados
+locales y su incertidumbre anteriores se conservan como historial, sin reinterpretarlos.
