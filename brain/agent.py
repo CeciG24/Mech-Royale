@@ -26,7 +26,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from brain.aim import lead, wrap, yaw_pitch
+from brain.aim import lead, mortar_pitch, wrap, yaw_pitch
 from brain.nav import NavField, NavGrid
 from brain.world import World
 
@@ -42,8 +42,8 @@ DEFAULTS = {
     "alpha_h": 0.50,         # a(h) activates below this HP fraction (practice variant)
     "gamma": 1.25,           # a(h) = 1 + gamma (1 - h)
     "psi": 1.5,              # every squad member is hunting us
-    "d_ref": 100.0,          # f_cross distance scale (m)
-    "eps": 0.5,
+    "k_cross": 0.5,          # f_cross normalisation (per-enemy pressure before the [0, 1] clip)
+    "eps": 1.0,
     "decay_s": 3.0,          # memory decay of last-known enemy positions
     "los_keep": 0.15,        # f_cross fraction kept when a building blocks the line
     "los_keep_mortar": 0.5,
@@ -53,16 +53,21 @@ DEFAULTS = {
     "u_finish": 0.8,
     "u_duel": 1.0,
     "u_obst": 1.5,
+    "u_counter": 0.5,
+    "zone_horizon_s": 3.0,   # f_zone projects the shrinking circle this far ahead
+    "silent_move": 0.42,     # |move| <= 5.0 / 11.7 suppresses step sounds
+    "regen_hp": 0.65,        # below this, skip speculative long shots that reset regen
     "hysteresis": 1.10,
     "fire_min": 0.35,        # minimum S_target to pull the trigger
     "energy_reserve": 30.0,
     "safe_frac": 0.72,
 }
 
-UPGRADE_ORDER = ["plating", "armor", "nanites", "servos", "sensors", "jets", "capacitor", "reactor",
-                 "gyros", "lightning_efficiency", "lightning_range", "lightning_chain", "gun_mag",
-                 "gun_rate", "gun_damage", "gun_velocity", "laser_charge", "laser_damage",
-                 "laser_pierce", "mortar_reload", "mortar_velocity", "mortar_splash"]
+# (1) universal survival: armor/HP/regen, mobility and energy; (2) sensors; (3) main weapon.
+UPGRADE_ORDER = ["armor", "plating", "nanites", "servos", "capacitor", "reactor", "jets", "sensors",
+                 "laser_charge", "laser_damage", "laser_pierce", "gun_rate", "gun_damage", "gun_mag",
+                 "gun_velocity", "gyros", "lightning_efficiency", "lightning_range", "lightning_chain",
+                 "mortar_reload", "mortar_velocity", "mortar_splash"]
 
 COMBAT_SOUNDS = {"gun": 0.6, "laser": 1.0, "laser_charge": 1.0, "lightning": 0.8, "mortar": 0.7,
                  "explosion": 0.4, "npc_gun": 0.0}
@@ -72,9 +77,15 @@ EST_DIST = {"laser": 150.0, "gun": 110.0, "lightning": 30.0, "mortar": 150.0}
 NDIR = 16
 RING_DIRS = 12
 RINGS = (5.0, 10.0, 16.0)
-# r_opt(w) and sigma_w for f_dist; cooling down adds R_COOL to back out of the enemy's reach
-R_OPT = {"lightning": (30.0, 10.0), "gun": (95.0, 35.0), "laser": (170.0, 45.0), "mortar": (150.0, 45.0)}
+# r_opt(w) and sigma_w for f_dist (lightning 18-36 m, laser 95-220 m, mortar 65-170 m, gun 40-110 m);
+# a reload or laser cooldown adds R_COOL to back out of the exchange
+R_OPT = {"lightning": (27.0, 9.0), "gun": (75.0, 35.0), "laser": (157.0, 60.0), "mortar": (117.0, 50.0)}
 R_COOL = 40.0
+# f_cross per weapon: (lethality, gate range, D_ref)
+WEAPON_THREAT = {"gun": (0.65, 235.0, 230.0), "laser": (1.0, 295.0, 200.0), "lightning": (1.5, 55.0, 45.0),
+                 "mortar": (0.6, 240.0, 240.0), "npc": (0.3, 95.0, 60.0)}
+LASER_CHARGING_DREF = 280.0
+UPGRADE_STEPS = (1, 3, 6, 10, 15, 21, 28)
 
 
 def _params() -> dict:
@@ -89,10 +100,12 @@ def _params() -> dict:
 
 
 class Threat:
-    __slots__ = ("id", "pos", "vel", "aim", "weapons", "charging", "hp", "max_hp", "seen", "est", "conf")
+    __slots__ = ("id", "pos", "vel", "aim", "weapons", "charging", "hp", "max_hp", "seen", "est", "conf",
+                 "cubes")
 
     def __init__(self, tid: int):
         self.id = tid
+        self.cubes = 0
         self.pos = np.zeros(3)
         self.vel = np.zeros(3)
         self.aim: Optional[float] = None
@@ -191,10 +204,12 @@ class Agent:
         target = self.select_target()
         move, boost, jump = self.plan_move(obs, locks, incoming, target)
         aim, fire = self.plan_aim_fire(locks, target)
-        a.update(self.plan_take(obs))
+        a.update(self.plan_take(obs, target))
+        # proactive reload only with <= 4 rounds and nobody close (reload is heard at 60 m)
         gun = next((w for w in me["weapons"] if w and w["kind"] == "gun"), None)
-        if target is None and gun is not None and gun.get("reload", 0) <= 0 \
-                and gun.get("ammo", 12) < gun["stats"].get("mag", 12) // 2:
+        close = any(math.dist(th.pos[:2], self.pos[:2]) < 60 for th in self.enemies() if th.id < 100)
+        if target is None and not close and gun is not None and gun.get("reload", 0) <= 0 \
+                and gun.get("ammo", 12) <= 4:
             a["reload"] = True
         a.update(move=[round(move[0], 4), round(move[1], 4)], boost=boost, jump=jump,
                  aim=[round(aim[0], 4), round(aim[1], 4)], fire=fire)
@@ -302,6 +317,7 @@ class Agent:
             th.charging = bool(m.get("charging"))
             th.hp = float(m.get("hp", th.hp))
             th.max_hp = float(m.get("max_hp", th.max_hp))
+            th.cubes = int(m.get("cubes", th.cubes) or 0)
             th.seen, th.est, th.conf = t, False, 1.0
             self.threats[m["id"]] = th
             vis[m["id"]] = th
@@ -482,8 +498,18 @@ class Agent:
             if hit <= 0:
                 continue
             clear = self._shot_clear(muzzle, th)
+            counter = 0.0
+            if "laser" in kinds and "mortar" in th.weapons and d <= 280:
+                counter = 1.0                      # cook-off +60%
+            elif "lightning" in kinds and th.charging and d <= 44:
+                counter = 1.6                      # short cancels the charge
+            elif "mortar" in kinds and "lightning" in th.weapons and 25 <= d <= 235:
+                counter = 0.6                      # concussion keeps the arc out of reach
+            lob = "mortar" in kinds and 25 <= d <= 235
+            obst = 0.0 if clear else (0.3 if lob else 1.0)
             s = P["u_hit"] * hit + P["u_finish"] * (1.0 - th.hp / max(1.0, th.max_hp)) \
-                + P["u_duel"] * self.aims_at_me(th, memory=8.0) - (0.0 if clear else P["u_obst"])
+                + P["u_counter"] * counter + P["u_duel"] * self.aims_at_me(th, memory=8.0) \
+                - P["u_obst"] * obst
             scored[th.id] = (s, th, clear)
         if not scored:
             self.target_id = None
@@ -515,17 +541,41 @@ class Agent:
             pts.append(self.dest)
         return pts
 
+    def pressure(self, th: Threat, d: np.ndarray) -> np.ndarray:
+        """threat(e) / ((d / D_ref(e))^2 + eps), maximised over the enemy's weapons; lethality is
+        scaled by its cubes (1 + 0.04 min(cubes, 10)) and gated by each weapon's reach."""
+        P = self.P
+        out = np.zeros_like(d)
+        cube = 1.0 + 0.04 * min(th.cubes, 10)
+        for k in th.weapons:
+            spec = WEAPON_THREAT.get(k)
+            if spec is None:
+                continue
+            leth, gate, dref = spec
+            if k == "laser" and th.charging:
+                dref, leth = LASER_CHARGING_DREF, leth * 1.5
+            lo = 12.0 if k == "mortar" else 0.0
+            v = leth * cube / ((d / dref) ** 2 + P["eps"])
+            out = np.maximum(out, np.where((d <= gate) & (d >= lo), v, 0.0))
+        return P["k_cross"] * out
+
     def f_cross_at(self, X: np.ndarray, Y: np.ndarray, srcs, los: Optional[np.ndarray]):
-        """Returns (f_cross, per-source pressure matrix)."""
+        """f_cross = clip(sum_e threat psi rho_rear decay / ((d / D_ref)^2 + eps)); a prism on the
+        line keeps only a fraction (more for mortar carriers), trees discount nothing."""
         P = self.P
         n = len(X)
         press = np.zeros((len(srcs), n))
+        # rho_rear: 1.5 when e would sit outside the front arc our torso can reach this tick
+        yaw = float(self.me["aim"][0])
+        reach = math.pi / 2 + float(self.me["stats"].get("turn_rate", 4.0)) * 0.1
         for s, th in enumerate(srcs):
             d = np.hypot(X - th.pos[0], Y - th.pos[1])
-            thr = np.array([weapon_danger(th.weapons, float(v)) for v in d])
             psi = P["psi"] if th.id < 100 else 1.0
             decay = math.exp(-max(0.0, self.t - th.seen) / P["decay_s"]) * th.conf
-            v = thr * psi * decay / ((d / P["d_ref"]) ** 2 + P["eps"])
+            to_e = np.arctan2(th.pos[1] - Y, th.pos[0] - X)
+            off = np.abs((to_e - yaw + np.pi) % (2 * np.pi) - np.pi)
+            rho = np.where(off > reach, 1.5, 1.0)
+            v = self.pressure(th, d) * psi * rho * decay
             if los is not None:
                 keep = P["los_keep_mortar"] if "mortar" in th.weapons else P["los_keep"]
                 v = v * np.where(los[s], 1.0, keep)
@@ -561,9 +611,8 @@ class Agent:
 
         enemies = self.enemies()
         dmeE = {th.id: math.dist(th.pos[:2], (x, y)) for th in enemies}
-        danger_srcs = sorted(enemies, key=lambda th: -weapon_danger(th.weapons, dmeE[th.id]) * th.conf
-                             / ((dmeE[th.id] / P["d_ref"]) ** 2 + P["eps"]))
-        srcs = [th for th in danger_srcs if weapon_danger(th.weapons, dmeE[th.id]) > 0.02][:4]
+        pnow = {th.id: float(self.pressure(th, np.array([dmeE[th.id]]))[0]) * th.conf for th in enemies}
+        srcs = [th for th in sorted(enemies, key=lambda th: -pnow[th.id]) if pnow[th.id] > 0.005][:4]
         if time.perf_counter() < self.deadline:
             self.update_cover([th for th in srcs if th.conf >= 0.5][:2])
 
@@ -598,10 +647,22 @@ class Agent:
                 veto |= ~better
 
         # ---------------------------------------------------------- f_zone
-        m = min(40.0, max(8.0, 0.2 * zr))
-        fz_cur = np.minimum(1.0, np.maximum(0.0, (dc - (zr - m)) / m) ** 2)
+        # project the circle zone_horizon_s ahead by linear interpolation of the shrink window
+        t_s, t_e = float(zn["shrink_start"]), float(zn["shrink_end"])
+        tp = self.t + P["zone_horizon_s"]
+        frac = 0.0
+        if tp > t_s and t_e > max(self.t, t_s):
+            frac = min(1.0, (tp - max(self.t, t_s)) / (t_e - max(self.t, t_s)))
+        cpx, cpy = zc[0] + (nc[0] - zc[0]) * frac, zc[1] + (nc[1] - zc[1]) * frac
+        rp = zr + (nr - zr) * frac
+        m = min(40.0, max(8.0, 0.2 * rp))
+        dp = np.hypot(X - cpx, Y - cpy)
+        sev = 0.5 + 0.5 * min(1.0, float(zn.get("dps", 20)) / 260.0)
+        fz_proj = np.minimum(1.0, np.maximum(0.0, (dp - (rp - m)) / m) ** 2 * sev)
+        if hp < 0.9:
+            fz_proj = np.minimum(1.0, fz_proj + 0.3 * (dc > zr))  # stepping out also burns the 5 s regen window
         fz_next = 0.6 * np.minimum(1.0, (fd / 40.0) ** 2) + 0.4 * np.minimum(1.0, fd / 200.0)
-        f_zone = np.maximum(fz_cur, urg * fz_next)
+        f_zone = np.maximum(fz_proj, urg * fz_next)
 
         # ---------------------------------------------------------- f_cross and f_cover
         los = None
@@ -612,9 +673,8 @@ class Agent:
             B = np.stack([np.tile(X, len(srcs)), np.tile(Y, len(srcs)), np.tile(gz + 5.5, len(srcs))], axis=1)
             los = self.world.los_batch(A, B, step=2.0).reshape(len(srcs), n)
         f_cross, press = self.f_cross_at(X, Y, srcs, los)
-        canopy = self.nav.canopy[Jc, Ic]
-        f_cross = f_cross * (1.0 - 0.3 * canopy)
-        static_cover = 0.6 * (1.0 - self.nav.openness[Jc, Ic]) + 0.4 * canopy
+        # solid prisms only: trees let bullets and lasers through
+        static_cover = 1.0 - self.nav.openness[Jc, Ic]
         if srcs and los is not None:
             wts = press.max(1) + 1e-6
             blocked = (~los).astype(float)
@@ -653,12 +713,16 @@ class Agent:
             f_aoe = np.maximum(f_aoe, exposed * (0.5 + 0.5 * np.clip(1.0 - lat / 8.0, 0.0, 1.0)))
         for bx, by, bt, k, w in self.blobs:
             if k in COMBAT_SOUNDS and self.t - bt < 3.0:
+                # bearing error ~7 deg: the blob widens with its distance from us
+                spread = 25.0 + 0.12 * math.hypot(bx - x, by - y)
                 db = np.hypot(X - bx, Y - by)
-                f_aoe = np.maximum(f_aoe, 0.5 * w * np.clip(1.0 - db / 40.0, 0.0, 1.0))
+                f_aoe = np.maximum(f_aoe, 0.5 * w * np.clip(1.0 - db / spread, 0.0, 1.0))
 
         # ---------------------------------------------------------- f_trap
         near = any(d < 90.0 for d in dmeE.values())
-        f_trap = (1.0 - self.escape[Jc, Ic]) * (1.0 if near else 0.3)
+        # no energy for jump + boost (or one concussion away from it) makes walls inescapable
+        short_e = 1.0 + 0.5 * (me["energy"] < 45)
+        f_trap = np.clip((1.0 - self.escape[Jc, Ic]) * (1.0 if near else 0.3) * short_e, 0.0, 1.0)
 
         # ---------------------------------------------------------- f_kin
         vel = np.array(me.get("vel", (0.0, 0.0, 0.0))[:2], dtype=float)
@@ -684,15 +748,17 @@ class Agent:
             th = target[0]
             ready = [w for w in me["weapons"] if w]
             best_k = None
-            for k in ("lightning", "gun", "laser", "mortar"):
-                if k in kinds and (k != "lightning" or me["energy"] >= 10):
+            for k in ("lightning", "laser", "mortar", "gun"):
+                if k in kinds and (k != "lightning" or me["energy"] >= 15):
                     best_k = k
                     break
             if best_k is not None:
                 ropt, sig = R_OPT[best_k]
                 w = next(w for w in ready if w["kind"] == best_k)
-                if w.get("reload", 0) > 0 or w.get("cooldown", 0) > 0.5:
+                if w.get("reload", 0) > 0 or (best_k == "laser" and w.get("cooldown", 0) > 0.3):
                     ropt += R_COOL
+                if "lightning" in th.weapons and best_k != "lightning":
+                    ropt = max(ropt, 60.0)  # stay outside their 45 m arc
                 dt = np.hypot(X - th.pos[0], Y - th.pos[1])
                 f_dist = np.exp(-((dt - ropt) ** 2) / (2 * sig * sig))
 
@@ -706,6 +772,7 @@ class Agent:
                 do = np.hypot(X - ox, Y - oy)
                 v = need * (0.5 + np.arctan((P["d_loot"] - do) / P["b_loot"]) / math.pi) * (1.0 - c)
                 f_loot = np.maximum(f_loot, v)
+        best_loot = max((o[2] for o in objs), default=0.0)
 
         # ---------------------------------------------------------- f_space
         mechs = [th for th in enemies if th.id < 100]
@@ -747,53 +814,68 @@ class Agent:
         threatened = bool(locks or incoming or shooter_near)
         boost = me["energy"] > P["energy_reserve"] and (
             threatened or urg >= 1.0 or not me.get("in_zone", True))
+        # acoustic stealth: no combat in sight and no zone pressure -> walk at <= 5 m/s, no boost
+        recent = any(not th.est and self.t - th.seen < 3.0 for th in enemies if th.id < 100)
+        if not threatened and not recent and urg < 0.5 and me.get("in_zone", True) \
+                and self.t - self.last_hit_t > 5.0 and best_loot < 0.5:
+            mag = min(mag, P["silent_move"])
+            boost = False
         return (h[0] * mag, h[1] * mag), boost, False
 
     # ================================================================== loot
     def loot_objects(self, obs: dict, kinds) -> List[Tuple[float, float, float]]:
-        """O_t with need(o, inventory) in [0, 1]."""
+        """O_t with need(o, inventory, cubes, h) in [0, 1]: (a) a weapon for the empty slot,
+        (b) cubes up to stat_cap 10 (past it only when 1-2 short of the next upgrade threshold,
+        since every cube also grows the hitbox), (c) supply drops about to land inside the zone."""
         x, y, z = self.pos
         out = []
-        cubes = self.me.get("cubes", 0)
+        me = self.me
+        cubes = int(me.get("cubes", 0))
+        hp = me["hp"] / max(1.0, me["max_hp"])
+        nxt = next((s for s in UPGRADE_STEPS if s > cubes), 99)
+        need_cube = 0.9 if cubes < 10 else (0.4 if nxt - cubes <= 2 else 0.05)
         for c in obs.get("cubes", []):
             p = c["pos"]
             if math.dist(p[:2], (x, y)) < 120 and abs(p[2] - z) < 3.5:
-                out.append((p[0], p[1], 0.9 if cubes < 10 else 0.15))
+                out.append((p[0], p[1], need_cube))
         if None in kinds:
+            pref = {"lightning": 1.0, "laser": 0.95, "mortar": 0.6}
             for p in obs.get("pickups", []):
-                if p["kind"] in kinds or p["kind"] in ("mortar", "gun"):
+                if p["kind"] in kinds or p["kind"] not in pref:
                     continue
                 q = p["pos"]
                 if math.dist(q[:2], (x, y)) < 120 and abs(q[2] - z) < 3.5:
-                    out.append((q[0], q[1], 1.0 if p["kind"] == "lightning" else 0.85))
+                    out.append((q[0], q[1], pref[p["kind"]]))
         for d in obs.get("drops", []):
             h = d.get("holder")
-            if (h is not None and h != self.me["id"]) or d.get("lands_in", 99.0) > 6.0:
+            lands = float(d.get("lands_in", 99.0))
+            if (h is not None and h != me["id"]) or lands > 12.0:
                 continue
             q = d["pos"]
-            if math.dist(q[:2], (x, y)) < 120 and self.time_to_edge(q[0], q[1]) > 14.0:
-                out.append((q[0], q[1], 1.0))
+            if math.dist(q[:2], (x, y)) < 150 and self.time_to_edge(q[0], q[1]) > 14.0 + lands:
+                out.append((q[0], q[1], 1.0 if (cubes < 10 or hp < 0.7) else 0.5))
         return out
 
-    def plan_take(self, obs: dict) -> dict:
+    def plan_take(self, obs: dict, target) -> dict:
+        """Fill the empty slot with the best complement to the gun, never in an open duel (the
+        equip lock leaves the slot dead for max(1, cooldown) s)."""
         x, y, z = self.pos
         weapons = self.me["weapons"]
         kinds = [w["kind"] if w else None for w in weapons]
-        for slot, k in enumerate(kinds):
-            if k == "mortar" and not (weapons[slot].get("charge", 0) > 0):
-                return {"drop": slot}
         if None not in kinds:
             return {}
+        if target is not None and self.aims_at_me(target[0]) and math.dist(target[0].pos[:2], (x, y)) < 120:
+            return {}
         reach = (self.cfg.get("loot") or {}).get("pickup_radius", 4.0) - 0.3
+        pref = {"lightning": 0, "laser": 1, "mortar": 2}
         best = None
         for p in obs.get("pickups", []):
-            if p["kind"] in kinds or p["kind"] in ("mortar", "gun"):
+            if p["kind"] in kinds or p["kind"] not in pref:
                 continue
             d = math.dist(p["pos"][:2], (x, y))
             if d <= reach and abs(p["pos"][2] - z) < 3.8:
-                pr = 0 if p["kind"] == "lightning" else 1
-                if best is None or pr < best[0]:
-                    best = (pr, p["id"])
+                if best is None or pref[p["kind"]] < best[0]:
+                    best = (pref[p["kind"]], p["id"])
         return {"take": best[1]} if best else {}
 
     # ================================================================== aim / fire
@@ -808,8 +890,13 @@ class Agent:
             th, s, clear = target
             d = math.dist(th.pos[:2], (x, y))
             short = th.charging and "lightning" in kinds and d <= 44
-            if (s >= self.P["fire_min"] and clear) or short:
-                return self.weapon_choice(th, weapons, kinds, eye, d, short)
+            lob = "mortar" in kinds and 25.0 <= d <= 235.0
+            # regen discipline: hurt, no finish in sight and not under fire -> no speculative long shots
+            hp = me["hp"] / max(1.0, me["max_hp"])
+            idle_shot = hp < self.P["regen_hp"] and d > 120 and not self.aims_at_me(th, memory=8.0) \
+                and th.hp / max(1.0, th.max_hp) > 0.3
+            if ((s >= self.P["fire_min"] and (clear or lob)) or short) and not idle_shot:
+                return self.weapon_choice(th, weapons, kinds, eye, d, short, clear)
             return list(yaw_pitch(eye, (th.pos[0], th.pos[1], th.pos[2] + 4.5))), [False, False]
         # no firing target: keep the front arc toward the most dangerous known enemy
         enemies = self.enemies()
@@ -829,27 +916,69 @@ class Agent:
                 return [math.atan2(b[1] - y, b[0] - x), 0.0], [False, False]
         return self.scan(me), [False, False]
 
-    def weapon_choice(self, th: Threat, weapons, kinds, eye, d: float, short: bool):
+    def _mortar_aim(self, th: Threat, w: dict) -> Optional[List[float]]:
+        """Ballistic elevation from the tube (pos.z + 9.5) onto the target's feet; prefer the
+        low arc and fall back to the high one when a prism sits on the low path."""
+        x, y, z = self.pos
+        st = w.get("stats", {})
+        v = float(st.get("speed", 72.0))
+        g = float(st.get("gravity", (self.cfg.get("weapons") or {}).get("mortar", {}).get("gravity", 22.0)))
+        tube = z + float(self.me["stats"].get("height", 9.0)) + 0.5
+        tof = math.dist(th.pos[:2], (x, y)) / max(1.0, v * 0.7)
+        tx, ty = th.pos[0] + th.vel[0] * tof, th.pos[1] + th.vel[1] * tof
+        d = math.hypot(tx - x, ty - y)
+        dz = th.pos[2] - tube
+        yaw = math.atan2(ty - y, tx - x)
+        for high in (False, True):
+            pitch = mortar_pitch(d, dz, v, g, high)
+            if pitch is None:
+                continue
+            vx, vz = v * math.cos(pitch), v * math.sin(pitch)
+            T = d / max(vx, 1e-3)
+            ts = np.linspace(0.0, T, 9)
+            P = np.stack([x + math.cos(yaw) * vx * ts, y + math.sin(yaw) * vx * ts,
+                          tube + vz * ts - 0.5 * g * ts * ts], axis=1)
+            if bool(self.world.los_batch(P[:-2], P[1:-1], step=3.0).all()):
+                return [yaw, pitch]
+        return None
+
+    def weapon_choice(self, th: Threat, weapons, kinds, eye, d: float, short: bool, clear: bool = True):
         fire = [False, False]
         centre = (th.pos[0], th.pos[1], th.pos[2] + (1.75 if th.id >= 100 else 4.5))
         me = self.me
         aim = list(yaw_pitch(eye, centre))
-        if "lightning" in kinds and d <= 44 and me["energy"] >= 3:
+        if "lightning" in kinds and d <= 44 and me["energy"] >= 3 and clear:
             s = kinds.index("lightning")
             cone = math.radians(weapons[s]["stats"].get("cone_deg", 30)) / 2
             fire[s] = abs(wrap(aim[0] - me["aim"][0])) < cone * 0.8
             return aim, fire
         if short:
             return aim, fire
-        if "laser" in kinds and d <= 280:
+        if "laser" in kinds and d <= 280 and clear:
             s = kinds.index("laser")
             w = weapons[s]
             err = abs(wrap(aim[0] - me["aim"][0])) + abs(aim[1] - me["aim"][1])
-            full = w.get("charge", 0) >= w["stats"].get("charge", 0.75) * 0.97
-            if w.get("cooldown", 0) <= 0.05 or w.get("charge", 0) > 0:
-                fire[s] = not (full and err < math.atan2(2.0, max(d, 1.0)))
+            on = err < math.atan2(2.0, max(d, 1.0))
+            ch = float(w.get("charge", 0))
+            full_s = float(w["stats"].get("charge", 0.75))
+            arc_near = any("lightning" in e.weapons and math.dist(e.pos[:2], self.pos[:2]) < 50
+                           for e in self.enemies() if e.id < 100)
+            # hold to >= 0.5 s (or full) on an exposed target; release early past min_charge when a
+            # lightning carrier closes in; let go on target so the 2 s auto-fire never wastes a shot
+            release = on and (ch >= min(0.5, full_s * 0.97) or (arc_near and ch >= 0.15))
+            if w.get("cooldown", 0) <= 0.05 or ch > 0:
+                fire[s] = not release
                 return aim, fire
-        if "gun" in kinds:
+        if "mortar" in kinds and 25.0 <= d <= 235.0 and (not clear or "gun" not in kinds or d > 150):
+            s = kinds.index("mortar")
+            w = weapons[s]
+            ma = self._mortar_aim(th, w)
+            if ma is not None:
+                err_y = abs(wrap(ma[0] - me["aim"][0]))
+                fire[s] = err_y < math.atan2(3.0, max(d, 1.0)) and abs(ma[1] - me["aim"][1]) < 0.02 \
+                    and w.get("cooldown", 0) <= 0.0
+                return ma, fire
+        if "gun" in kinds and clear:
             s = kinds.index("gun")
             w = weapons[s]
             p = lead(eye, centre, th.vel, w["stats"].get("speed", 252.0), 1.0)
