@@ -29,7 +29,7 @@ def factory(kind: str):
 
 
 def play(job):
-    seed, us, opp, overrides = job
+    seed, us, opp, overrides, squad = job
     from sim.engine import Match
     if overrides:
         os.environ["AGENT_PARAMS"] = json.dumps(overrides)
@@ -42,7 +42,7 @@ def play(job):
             kind = opp if opp != "mix" else ("example" if s % 4 == 0 else "house")
             lineup.append((kind, factory(kind)))
     t0 = time.perf_counter()
-    res = Match(lineup, seed, timed=(slot,)).run()
+    res = Match(lineup, seed, timed=(slot,), squad_prey=slot if squad else None).run()
     me = res["mechs"][slot]
     me["wall_s"] = time.perf_counter() - t0
     me["seed"] = seed
@@ -83,9 +83,11 @@ def main():
     ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) - 2))
     ap.add_argument("--params", default="", help="JSON dict of agent parameter overrides")
     ap.add_argument("--out", default="")
+    ap.add_argument("--squad", action="store_true",
+                    help="house bots share vision, never fight each other, and hunt the player")
     args = ap.parse_args()
     overrides = json.loads(args.params) if args.params else {}
-    jobs = [(args.seed + k, args.bot, args.opp, overrides) for k in range(args.matches)]
+    jobs = [(args.seed + k, args.bot, args.opp, overrides, args.squad) for k in range(args.matches)]
     t0 = time.perf_counter()
     if args.jobs > 1:
         with mp.Pool(args.jobs) as pool:
@@ -93,7 +95,7 @@ def main():
     else:
         rows = [play(j) for j in jobs]
     rows.sort(key=lambda r: r["seed"])
-    summarize(rows, f"{args.bot} vs {args.opp}")
+    summarize(rows, f"{args.bot} vs {args.opp}{' squad' if args.squad else ''}")
     print(f"   total wall {time.perf_counter() - t0:.0f}s")
     if args.out:
         with open(args.out, "w") as fh:

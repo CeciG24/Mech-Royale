@@ -223,7 +223,8 @@ BotFactory = Callable[[dict], Any]
 
 class Match:
     def __init__(self, bots: List[Tuple[str, BotFactory]], seed: int, cfg: Optional[dict] = None,
-                 timed: Tuple[int, ...] = (), enforce_budget: bool = True, verbose: bool = False):
+                 timed: Tuple[int, ...] = (), enforce_budget: bool = True, verbose: bool = False,
+                 squad_prey: Optional[int] = None):
         self.cfg = cfg or load_config()
         self.rng = random.Random(seed)
         self.nrng = np.random.default_rng(seed)
@@ -236,6 +237,8 @@ class Match:
         self.timed = set(timed)
         self.enforce_budget = enforce_budget
         self.verbose = verbose
+        self.squad_prey = squad_prey
+        self.squad_seen: Optional[Tuple[float, dict]] = None
         self.next_id = {"proj": 1, "crate": 1000, "cube": 5000, "pickup": 8000, "drop": 20000}
         self.projs: List[Proj] = []
         self.crates: Dict[int, dict] = {}
@@ -329,10 +332,17 @@ class Match:
             p = self._open_point(margin=40)
             if p is not None:
                 self.npcs[100 + n] = NPC(100 + n, p, cfg)
+        roles = ["easy"] * 4 + ["medium"] * 4 + ["hard"] * 4 + ["expert"] * 3
+        house_i = 0
         for slot, (name, factory) in enumerate(bots):
             hello = {"type": "hello", "protocol": "mechfight/1", "slot": slot,
                      "seed": self.rng.randrange(2 ** 32),
                      "map": {"dir": ARENA, "files": list(MAP_FILES)}, "config": cfg}
+            if self.squad_prey is not None and slot != self.squad_prey:
+                hello["squad"] = True
+                hello["prey"] = self.squad_prey
+                hello["role"] = roles[min(house_i, len(roles) - 1)]
+                house_i += 1
             t0 = time.perf_counter()
             bot = factory(hello)
             if slot in self.timed and self.verbose:
@@ -365,6 +375,8 @@ class Match:
             alive = self.alive_mechs()
             if len(alive) <= 1 or self.t >= dur - 1e-9:
                 break
+            if self.squad_prey is not None and not self.mechs[self.squad_prey].alive:
+                break
             if self.tick % self.decide_every == 0:
                 self.decide()
             self.step()
@@ -388,9 +400,52 @@ class Match:
         return {"t": self.t, "mechs": out}
 
     # ------------------------------------------------------------------ decisions
+    def _hunter_count(self, alive_n: int, n_house: int) -> int:
+        """Practice squad: one hunter early, more as the field thins, every remaining bot late."""
+        if alive_n <= 6 or self.t >= 300:
+            return n_house
+        if alive_n <= 9 or self.t >= 200:
+            return min(n_house, 6)
+        if alive_n <= 13 or self.t >= 90:
+            return min(n_house, 3)
+        return 1
+
+    def _share_squad(self, obs: Dict[int, dict], alive: List[Mech]) -> None:
+        """House bots share sight of the player, ignore each other, and only the active hunters
+        are told where the player is."""
+        prey = self.mechs[self.squad_prey]
+        house = [m for m in alive if m.id != self.squad_prey]
+        if not house or not prey.alive:
+            return
+        seen = False
+        for m in house:
+            if any(e.get("id") == prey.id for e in obs[m.id]["mechs"]):
+                seen = True
+                break
+        if seen:
+            snap = {"id": prey.id, "kind": "mech",
+                    "pos": [round(float(v), 2) for v in prey.pos],
+                    "vel": [round(float(v), 2) for v in prey.vel],
+                    "aim": [round(prey.aim[0], 3), round(prey.aim[1], 3)],
+                    "hp": round(prey.hp, 2), "max_hp": round(prey.max_hp, 2), "cubes": prey.cubes,
+                    "weapons": [w.kind for w in prey.weapons if w is not None],
+                    "charging": prey.charging()}
+            self.squad_seen = (self.t, snap)
+        remembered = self.squad_seen is not None and self.t - self.squad_seen[0] <= 8.0
+        n = self._hunter_count(len(alive), len(house))
+        ranked = sorted(house, key=lambda m: float(np.hypot(*(m.pos[:2] - prey.pos[:2]))))
+        hunters = {m.id for m in ranked[:n]}
+        for m in house:
+            kept = [e for e in obs[m.id]["mechs"] if e.get("kind") != "mech"]
+            if m.id in hunters and remembered:
+                kept.append(self.squad_seen[1])
+            obs[m.id]["mechs"] = kept
+
     def decide(self) -> None:
         alive = self.alive_mechs()
         obs = self.build_obs(alive)
+        if self.squad_prey is not None:
+            self._share_squad(obs, alive)
         budget = self.cfg["bot"]["tick_budget_ms"]
         coast = self.cfg["bot"]["coast_s"]
         for m in alive:

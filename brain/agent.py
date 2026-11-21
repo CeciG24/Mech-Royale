@@ -135,6 +135,7 @@ class Agent:
         self.mode = "idle"
         self.mech = self.cfg.get("mech", {})
         self.attackers: Dict[int, float] = {}
+        self.last_contact: Optional[Tuple[float, float, float]] = None
         self.cover: Optional[NavField] = None
         self.cover_key: Optional[Tuple[float, float, float, float, float]] = None
 
@@ -247,6 +248,8 @@ class Agent:
             th.seen, th.est, th.conf = t, False, 1.0
             self.threats[m["id"]] = th
             vis[m["id"]] = th
+            if not npc:
+                self.last_contact = (float(th.pos[0]), float(th.pos[1]), t)
         for b in obs.get("beams", []):
             by = b.get("by")
             if by is None or by in vis or by >= 100:
@@ -565,7 +568,19 @@ class Agent:
                 lock = 2.5 if th.charging else 1.0
                 danger += th.conf * wd * exp * seen * prox * lock
             danger *= 1.0 - 0.4 * self.nav.canopy[Jc, Ic]
+            # Early practice sends one hunter. Running forever keeps us in the open; hold a
+            # ring and shoot back instead of treating every contact as a rout.
+            solo = len([th for th in srcs if getattr(th, "id", -1) >= 0 and not th.est]) <= 1
+            if solo and obs["alive"] >= 10:
+                danger *= 0.45
             score -= P["w_threat"] * danger
+
+        lone = [th for th in self.threats.values()
+                if 0 <= th.id < 100 and not th.est and self.t - th.seen < 0.4]
+        if len(lone) == 1 and obs["alive"] >= 8:
+            th = lone[0]
+            dd = np.hypot(C[:, 0] - th.pos[0], C[:, 1] - th.pos[1])
+            score -= 6.0 * np.clip(np.abs(dd - 75.0) / 40.0, 0.0, 2.0)
 
         # incoming projectiles
         if incoming:
@@ -621,10 +636,13 @@ class Agent:
                 d0 = math.hypot(lx - x, ly - y)
                 dd = np.hypot(C[:, 0] - lx, C[:, 1] - ly)
                 score += P["w_loot"] * val * np.clip((d0 - dd) / max(d0, 1.0), -1.0, 1.0)
-        if self.target is not None:
+        if self.target is not None and self.mode in ("idle", "hide"):
             score += P["w_stay"] * (np.hypot(C[:, 0] - self.target[0], C[:, 1] - self.target[1]) < 3.0)
-        if self.mode == "hide":
-            score[0] += P["w_stay"]
+        # Standing still is a laser target. The practice squad hunts only us, so a planted mech
+        # dies first. Penalize the current cell whenever someone can be shooting.
+        hot = bool(locks or shooters or self.t - self.last_hit_t < 4.0)
+        if hot:
+            score[0] -= 8.0
 
         best = int(np.argmax(score))
         tx, ty = pts[best]
@@ -647,10 +665,22 @@ class Agent:
         dx, dy = tx - x, ty - y
         L = math.hypot(dx, dy)
         if L < 0.8:
+            vis = [th for th in self.threats.values()
+                   if th.id < 100 and not th.est and self.t - th.seen < 1.0]
+            srcs = locks or shooters or vis
+            if srcs or self.t - self.last_hit_t < 4.0:
+                src = srcs[0] if srcs else None
+                if src is not None:
+                    bx, by = x - src.pos[0], y - src.pos[1]
+                elif self.last_dmg_bearing is not None:
+                    b = self.last_dmg_bearing[0]
+                    bx, by = -math.cos(b), -math.sin(b)
+                else:
+                    bx, by = 1.0, 0.0
+                ln = math.hypot(bx, by) or 1.0
+                return (-by / ln * self.flip, bx / ln * self.flip), me["energy"] > 15, False
             return (0.0, 0.0), False, False
         mag = 1.0
-        if self.mode in ("idle", "hide") and self.sneaky(obs):
-            mag = 0.4
         if L < 3.0:
             mag = min(mag, max(0.3, L / 3.0))
         energy = me["energy"]
@@ -660,11 +690,21 @@ class Agent:
             boost = True
         return (dx / L * mag, dy / L * mag), boost, False
 
-    def sneaky(self, obs: dict) -> bool:
-        """Walk under step_speed (silent) when someone may be close but has not found us."""
-        if obs["alive"] <= self.P["sneak_alive"]:
+    def _sees_us(self, th: Threat) -> bool:
+        """Best guess that this mech currently has us in view (proximity, its aim cone, or it hit us)."""
+        d = math.dist(th.pos[:2], self.pos[:2])
+        if d <= 45.0 or th.charging:
             return True
-        return any(b[3] in MOVE_SOUNDS and self.t - b[2] < 4.0 for b in self.blobs)
+        if self.t - self.attackers.get(th.id, -1e9) < 2.5:
+            return True
+        if th.aim is None:
+            return False
+        bearing = math.atan2(self.pos[1] - th.pos[1], self.pos[0] - th.pos[0])
+        return abs(wrap(th.aim - bearing)) <= math.radians(65)
+
+    def sneaky(self, obs: dict) -> bool:
+        """Unused against the practice squad: walking slowly is how a laser lands."""
+        return False
 
     # ================================================================== loot
     def loot_targets(self, obs: dict) -> List[Tuple[float, float, float]]:
@@ -758,10 +798,12 @@ class Agent:
             d = math.dist(th.pos[:2], (x, y))
             zone = self.zone
             endgame = zone["radius"] <= 30 or obs["alive"] <= 2 or zone["dps"] >= 160
-            under_fire = th in self.shooters()
-            far_cover = self.cover_dist(x, y) > self.P["cover_far"]
-            shoot = d <= self.P["fight_close"] or endgame or (th.hp < 260 and d < 120) \
-                or (under_fire and far_cover and d < 200)
+            # Practice is a squad that hunts only us. Once a hunter can see us, not shooting
+            # is free damage; while they cannot see us, a shot (gun carries 320 m) gives us away.
+            seen = self._sees_us(th)
+            solo = len(vis_mechs) == 1 and obs["alive"] >= 8
+            shoot = (seen and d <= 230) or (solo and d <= 180) or d <= self.P["fight_close"] \
+                or endgame or (th.hp < 400 and d < 160)
             short = th.charging and "lightning" in kinds and d <= 44
             if shoot or short:
                 target = (th, d, short)

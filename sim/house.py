@@ -37,10 +37,24 @@ class HouseBot:
         self.cfg = hello["config"]
         self.rng = random.Random(hello["seed"])
         self.world, self.nav = get_map(self.cfg)
-        self.pref = self.rng.uniform(80, 150)
-        self.aggr = self.rng.uniform(0.6, 1.0)
-        self.lead_frac = self.rng.choice([0.0, 0.5, 1.0])
-        self.want = self.rng.choice(["laser", "laser", "lightning", "mortar"])
+        self.prey = hello.get("prey")
+        role = hello.get("role")
+        # Practice squad: 4 easy, 4 medium, 4 hard, 3 expert. Easy closes in and guns;
+        # expert holds laser range and leads shots.
+        roles = {
+            "easy": (45.0, 0.45, 0.0, False, "lightning"),
+            "medium": (90.0, 0.7, 0.5, True, "laser"),
+            "hard": (120.0, 0.9, 1.0, True, "laser"),
+            "expert": (150.0, 1.0, 1.0, True, "laser"),
+        }
+        if role in roles:
+            self.pref, self.aggr, self.lead_frac, self.use_laser, self.want = roles[role]
+        else:
+            self.pref = self.rng.uniform(80, 150)
+            self.aggr = self.rng.uniform(0.6, 1.0)
+            self.lead_frac = self.rng.choice([0.0, 0.5, 1.0])
+            self.use_laser = True
+            self.want = self.rng.choice(["laser", "laser", "lightning", "mortar"])
         self.strafe = 1.0
         self.strafe_t = 0.0
         self.last = None
@@ -95,13 +109,16 @@ class HouseBot:
                     d = 40 if s["dist"] == "near" else 110
                     self.hunt = (x + d * math.cos(s["bearing"]), y + d * math.sin(s["bearing"]), t)
 
-        enemies = sorted((m for m in obs["mechs"] if m["kind"] == "mech"),
-                         key=lambda m: math.dist(m["pos"][:2], (x, y)))
+        enemies = [m for m in obs["mechs"] if m["kind"] == "mech"]
+        if self.prey is not None:
+            enemies = [m for m in enemies if m["id"] == self.prey]
+        enemies.sort(key=lambda m: math.dist(m["pos"][:2], (x, y)))
         npcs = sorted((m for m in obs["mechs"] if m["kind"] == "npc"),
                       key=lambda m: math.dist(m["pos"][:2], (x, y)))
         hit_by_npc = any(e["type"] == "damaged" and (e.get("by") or 0) >= 100 for e in obs["events"])
         target = None
-        if enemies and math.dist(enemies[0]["pos"][:2], (x, y)) < 230:
+        chase = 2500 if self.prey is not None else 230
+        if enemies and math.dist(enemies[0]["pos"][:2], (x, y)) < chase:
             target = enemies[0]
         elif npcs and (hit_by_npc or (math.dist(npcs[0]["pos"][:2], (x, y)) < 70 and self.rng.random() < self.aggr)):
             target = npcs[0]
@@ -147,7 +164,7 @@ class HouseBot:
             use = None
             if slot_z is not None and d < 42 and me["energy"] >= 3:
                 use = slot_z
-            elif slot_l is not None and d < 270 and (weapons[slot_l]["cooldown"] <= 0 or weapons[slot_l].get("charge", 0) > 0):
+            elif self.use_laser and slot_l is not None and d < 270 and (weapons[slot_l]["cooldown"] <= 0 or weapons[slot_l].get("charge", 0) > 0):
                 use = slot_l
             elif slot_m is not None and 30 < d < 220 and weapons[slot_m]["cooldown"] <= 0 and target is not None:
                 use = slot_m

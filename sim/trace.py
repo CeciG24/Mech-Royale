@@ -45,7 +45,7 @@ def main():
     args = ap.parse_args()
     slot = args.seed % 16
     lineup = [("agent", Traced) if s == slot else ("house", HouseBot) for s in range(16)]
-    res = Match(lineup, args.seed, timed=(slot,)).run()
+    res = Match(lineup, args.seed, timed=(slot,), squad_prey=slot).run()
     me = res["mechs"][slot]
     print("RESULT place", me["place"], "death", me["death_t"], me["cause"], "dmg", me["dmg_taken"], "cubes", me["cubes"])
 
