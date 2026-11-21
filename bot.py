@@ -41,4 +41,10 @@ class Bot:
 
 
 if __name__ == "__main__":
+    # Import native extensions before the blocking stdin reader starts (Windows).
+    # Preserve the fallback if the dependency cannot be loaded.
+    try:
+        import numpy  # noqa: F401
+    except Exception:
+        pass
     mf.run(Bot)
