@@ -24,7 +24,7 @@ class Traced(Agent):
         me = obs["self"]
         dmg = [e for e in obs["events"] if e["type"] == "damaged"]
         line = None
-        if dmg or obs["tick"] % 20 == 0:
+        if dmg or obs["tick"] % 20 == 0 or any(e["type"] == "hit" for e in obs["events"]):
             vis = [(m["id"], round(math.dist(m["pos"][:2], me["pos"][:2])), "".join(w[0] for w in m.get("weapons", [])),
                     "C" if m.get("charging") else "") for m in obs["mechs"] if m["kind"] == "mech"]
             z = obs["zone"]
@@ -32,6 +32,10 @@ class Traced(Agent):
             line = (f"t={obs['t']:6.1f} alive={obs['alive']:2d} hp={me['hp']:6.0f}/{me['max_hp']:.0f} en={me['energy']:3.0f} "
                     f"mode={self.mode:6s} inz={int(me['in_zone'])} dnext={dn:4.2f} urg={self.zone_urgency():.2f} "
                     f"vis={vis} thr={len(self.threats)} cubes={me['cubes']}")
+            hits = [e for e in obs["events"] if e["type"] == "hit"]
+            if hits:
+                line += " HIT " + ",".join(f"{e['weapon']}:{e['amount']:.0f}>{e['target']}" for e in hits)
+            line += f" act=mv({a.get('move',[0,0])[0]:.1f},{a.get('move',[0,0])[1]:.1f}) b={int(bool(a.get('boost')))} f={a.get('fire')} w={[w['kind'] if w else None for w in me['weapons']]}"
             if dmg:
                 line += " DMG " + ", ".join(f"{e['weapon']}:{e['amount']:.0f}{'R' if e.get('rear') else ''} by {e['by']}" for e in dmg)
         if line:

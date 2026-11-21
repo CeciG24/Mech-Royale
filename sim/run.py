@@ -83,10 +83,12 @@ def main():
     ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) - 2))
     ap.add_argument("--params", default="", help="JSON dict of agent parameter overrides")
     ap.add_argument("--out", default="")
+    ap.add_argument("--ffa", action="store_true",
+                    help="free-for-all: house bots fight each other instead of hunting the player as a squad")
     args = ap.parse_args()
     overrides = json.loads(args.params) if args.params else {}
-    # Practice format only: house bots share vision, never fight each other, and hunt the player.
-    jobs = [(args.seed + k, args.bot, args.opp, overrides, True) for k in range(args.matches)]
+    # Squad (default): house bots share vision, never fight each other, and hunt the player.
+    jobs = [(args.seed + k, args.bot, args.opp, overrides, not args.ffa) for k in range(args.matches)]
     t0 = time.perf_counter()
     if args.jobs > 1:
         with mp.Pool(args.jobs) as pool:
@@ -94,7 +96,7 @@ def main():
     else:
         rows = [play(j) for j in jobs]
     rows.sort(key=lambda r: r["seed"])
-    summarize(rows, f"{args.bot} vs {args.opp} squad")
+    summarize(rows, f"{args.bot} vs {args.opp} {'ffa' if args.ffa else 'squad'}")
     print(f"   total wall {time.perf_counter() - t0:.0f}s")
     if args.out:
         with open(args.out, "w") as fh:

@@ -334,6 +334,7 @@ class Match:
                 self.npcs[100 + n] = NPC(100 + n, p, cfg)
         roles = ["easy"] * 4 + ["medium"] * 4 + ["hard"] * 4 + ["expert"] * 3
         house_i = 0
+        self.role_rank: Dict[int, int] = {}
         for slot, (name, factory) in enumerate(bots):
             hello = {"type": "hello", "protocol": "mechfight/1", "slot": slot,
                      "seed": self.rng.randrange(2 ** 32),
@@ -342,6 +343,7 @@ class Match:
                 hello["squad"] = True
                 hello["prey"] = self.squad_prey
                 hello["role"] = roles[min(house_i, len(roles) - 1)]
+                self.role_rank[slot] = house_i
                 house_i += 1
             t0 = time.perf_counter()
             bot = factory(hello)
@@ -433,7 +435,9 @@ class Match:
             self.squad_seen = (self.t, snap)
         remembered = self.squad_seen is not None and self.t - self.squad_seen[0] <= 8.0
         n = self._hunter_count(len(alive), len(house))
-        ranked = sorted(house, key=lambda m: float(np.hypot(*(m.pos[:2] - prey.pos[:2]))))
+        # rules: the squad hunts "weakest first" (easy, then medium, hard, expert)
+        ranked = sorted(house, key=lambda m: (self.role_rank.get(m.id, 99),
+                                              float(np.hypot(*(m.pos[:2] - prey.pos[:2])))))
         hunters = {m.id for m in ranked[:n]}
         for m in house:
             kept = [e for e in obs[m.id]["mechs"] if e.get("kind") != "mech"]

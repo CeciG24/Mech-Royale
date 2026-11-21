@@ -73,6 +73,15 @@ DEFAULTS = {
     "fire_min": 0.35,        # minimum S_target to pull the trigger
     "energy_reserve": 30.0,
     "safe_frac": 0.72,
+    "gun_ropt": 115.0,
+    "w_dodge": 12.0,
+    "w_commit": 20.0,
+    "dodge_boost_r": 0.0,
+    "w_arc": 0.0,
+    "loot_r": 120.0,
+    "loot_mem": 0,
+    "mortar_ok": 1,
+    "swap_mortar": 0,
 }
 
 # (1) universal survival: armor/HP/regen, mobility and energy; (2) sensors; (3) main weapon.
@@ -128,6 +137,15 @@ class Threat:
         self.seen = -1e9
         self.est = True
         self.conf = 0.0
+
+
+def pid_gone(pid, entry, seen, x: float, y: float, t: float) -> bool:
+    """A remembered pickup is gone once we stand near enough to see it (45 m proximity) and it
+    is missing, or after 120 s."""
+    if pid in seen:
+        return False
+    q = entry[1]
+    return math.dist(q[:2], (x, y)) < 35.0 or t - entry[2] > 120.0
 
 
 def weapon_danger(kinds, d: float) -> float:
@@ -188,6 +206,9 @@ class Agent:
         self.rear_hits: List[Tuple[float, float, Optional[int]]] = []
         self.flip = 1.0
         self.flip_t = 0.0
+        self.loot_mem: Dict[int, Tuple[str, Tuple[float, float, float], float]] = {}
+        self.commit_dir: Optional[Tuple[float, float]] = None
+        self.commit_until = -1.0
 
     def _escape_map(self) -> np.ndarray:
         """Fraction of the 8 directions with at least two walkable steps (8 m) from each cell."""
@@ -787,6 +808,32 @@ class Agent:
             repeat = np.clip((ux * self.heading[0] + uy * self.heading[1] - 0.9) / 0.1, 0.0, 1.0)
         f_kin = np.clip(0.45 * turn + 0.4 * still + 0.15 * repeat, 0.0, 1.0)
 
+        # ---------------------------------------------------------- f_dodge
+        # a bullet needs d / 252 s to arrive: moving across the line of fire by more than the
+        # hitbox (2.5 m + 0.3 m) in that time makes an unled shot miss
+        f_dodge = np.zeros(n)
+        gunners = [th for th in enemies if th.id < 100 and not th.est and self.t - th.seen < 1.0
+                   and "gun" in th.weapons and 15.0 < dmeE[th.id] < 235.0]
+        if gunners and P["w_dodge"] > 0:
+            acc, wsum = np.zeros(n), 0.0
+            sp = float(self.mech.get("walk_speed", 11.7))
+            for th in gunners:
+                d = dmeE[th.id]
+                bx, by = (x - th.pos[0]) / d, (y - th.pos[1]) / d
+                lat = np.abs(-ux * by + uy * bx)
+                need = 2.8 / (d / 252.0 * sp)
+                wt = 1.0 / (1.0 + (d / 120.0) ** 2)
+                acc += wt * np.clip(lat / max(need, 0.05), 0.0, 1.0) * (dist > 0.1)
+                wsum += wt
+            f_dodge = acc / wsum
+        # lightning (240 dps, 30 deg cone) cannot be dodged inside 45 m: keep carriers outside it
+        f_arc = np.zeros(n)
+        if P["w_arc"] > 0:
+            for th in enemies:
+                if th.id < 100 and "lightning" in th.weapons and self.t - th.seen < 3.0:
+                    dl = np.hypot(X - th.pos[0], Y - th.pos[1])
+                    f_arc = np.maximum(f_arc, np.clip((62.0 - dl) / 20.0, 0.0, 1.0))
+
         # ---------------------------------------------------------- f_dist
         f_dist = np.zeros(n)
         if target is None and self.offense:
@@ -803,6 +850,8 @@ class Agent:
                     break
             if best_k is not None:
                 ropt, sig = R_OPT[best_k]
+                if best_k == "gun":
+                    ropt = P["gun_ropt"]
                 w = next(w for w in ready if w["kind"] == best_k)
                 if w.get("reload", 0) > 0 or (best_k == "laser" and w.get("cooldown", 0) > 0.3):
                     ropt += R_COOL
@@ -849,7 +898,13 @@ class Agent:
 
         U = (- W["zone"] * f_zone - W["cross"] * alpha * f_cross - W["aoe"] * f_aoe
              - W["trap"] * f_trap - W["kin"] * f_kin + W["cover"] * alpha * f_cover
-             + W["dist"] * f_dist + W["loot"] * beta * f_loot + W["space"] * f_space)
+             + W["dist"] * f_dist + W["loot"] * beta * f_loot + W["space"] * f_space
+             + P["w_dodge"] * f_dodge - P["w_arc"] * f_arc)
+        # under fire, hold a direction for 0.6-1.1 s: flipping every tick cancels our speed
+        # (58.5 m/s^2 takes 0.4 s to reverse 11.7 m/s), so even unled shots keep landing
+        committed = gunners and self.commit_dir is not None and self.t < self.commit_until
+        if committed and P["w_commit"] > 0:
+            U = U + P["w_commit"] * np.clip(ux * self.commit_dir[0] + uy * self.commit_dir[1], 0.0, 1.0)
         U[veto] = -1_000_000.0
 
         best = int(np.argmax(U))
@@ -865,6 +920,9 @@ class Agent:
             self.straight_s = 0.0
             return (0.0, 0.0), False, False
         h = (dx / L, dy / L)
+        if gunners and not committed:
+            self.commit_dir = h
+            self.commit_until = self.t + self.rng.uniform(0.6, 1.1)
         if self.heading is not None and h[0] * self.heading[0] + h[1] * self.heading[1] > 0.95:
             self.straight_s += 0.1
         else:
@@ -874,6 +932,8 @@ class Agent:
         threatened = bool(locks or incoming or shooter_near)
         boost = me["energy"] > P["energy_reserve"] and (
             threatened or urg >= 1.0 or not me.get("in_zone", True))
+        if gunners and min(dmeE[th.id] for th in gunners) < P["dodge_boost_r"] and me["energy"] > 15:
+            boost, mag = True, 1.0
         # acoustic stealth: no combat in sight and no zone pressure -> walk at <= 5 m/s, no boost
         recent = any(not th.est and self.t - th.seen < 3.0 for th in enemies if th.id < 100)
         if not threatened and not recent and urg < 0.5 and me.get("in_zone", True) \
@@ -883,6 +943,18 @@ class Agent:
         return (h[0] * mag, h[1] * mag), boost, False
 
     # ================================================================== loot
+    def weapon_pref(self, kinds) -> Dict[str, float]:
+        """Wanted pickups: any weapon for an empty slot; with swap_mortar a carried mortar
+        (laser cook-off bait, slow shells) is traded for a laser or lightning."""
+        pref = {"lightning": 1.0, "laser": 0.95}
+        if self.P["mortar_ok"]:
+            pref["mortar"] = 0.6
+        if None in kinds:
+            return pref
+        if self.P["swap_mortar"] and "mortar" in kinds:
+            return {"lightning": 0.9, "laser": 0.9}
+        return {}
+
     def loot_objects(self, obs: dict, kinds) -> List[Tuple[float, float, float]]:
         """O_t with need(o, inventory, cubes, h) in [0, 1]: (a) a weapon for the empty slot,
         (b) cubes up to stat_cap 10 (past it only when 1-2 short of the next upgrade threshold,
@@ -898,14 +970,22 @@ class Agent:
             p = c["pos"]
             if math.dist(p[:2], (x, y)) < 120 and abs(p[2] - z) < 3.5:
                 out.append((p[0], p[1], need_cube))
-        if None in kinds:
-            pref = {"lightning": 1.0, "laser": 0.95, "mortar": 0.6}
-            for p in obs.get("pickups", []):
-                if p["kind"] in kinds or p["kind"] not in pref:
+        P = self.P
+        for p in obs.get("pickups", []):
+            self.loot_mem[p["id"]] = (p["kind"], tuple(p["pos"]), self.t)
+        seen = {p["id"] for p in obs.get("pickups", [])}
+        for pid in [k for k, v in self.loot_mem.items()
+                    if pid_gone(k, v, seen, x, y, self.t)]:
+            del self.loot_mem[pid]
+        pref = self.weapon_pref(kinds)
+        if pref:
+            src = ([(k, v[0], v[1]) for k, v in self.loot_mem.items()] if P["loot_mem"]
+                   else [(p["id"], p["kind"], p["pos"]) for p in obs.get("pickups", [])])
+            for _, kind, q in src:
+                if kind in kinds or kind not in pref:
                     continue
-                q = p["pos"]
-                if math.dist(q[:2], (x, y)) < 120 and abs(q[2] - z) < 3.5:
-                    out.append((q[0], q[1], pref[p["kind"]]))
+                if math.dist(q[:2], (x, y)) < P["loot_r"] and abs(q[2] - z) < 3.5:
+                    out.append((q[0], q[1], pref[kind]))
         if self.offense and cubes < 10:
             for c in obs.get("crates", []):
                 q = c["pos"]
@@ -927,12 +1007,13 @@ class Agent:
         x, y, z = self.pos
         weapons = self.me["weapons"]
         kinds = [w["kind"] if w else None for w in weapons]
-        if None not in kinds:
+        want = self.weapon_pref(kinds)
+        if not want:
             return {}
         if target is not None and self.aims_at_me(target[0]) and math.dist(target[0].pos[:2], (x, y)) < 120:
             return {}
         reach = (self.cfg.get("loot") or {}).get("pickup_radius", 4.0) - 0.3
-        pref = {"lightning": 0, "laser": 1, "mortar": 2}
+        pref = {k: -v for k, v in want.items()}
         best = None
         for p in obs.get("pickups", []):
             if p["kind"] in kinds or p["kind"] not in pref:
@@ -941,7 +1022,14 @@ class Agent:
             if d <= reach and abs(p["pos"][2] - z) < 3.8:
                 if best is None or pref[p["kind"]] < best[0]:
                     best = (pref[p["kind"]], p["id"])
-        return {"take": best[1]} if best else {}
+        if not best:
+            return {}
+        if None in kinds:
+            return {"take": best[1]}
+        w = weapons[kinds.index("mortar")]
+        if w.get("cooldown", 0) > 0.5:
+            return {}
+        return {"take": best[1], "drop": kinds.index("mortar")}
 
     # ================================================================== aim / fire
     def plan_aim_fire(self, locks, target):
