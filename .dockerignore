@@ -3,6 +3,8 @@
 .dockerignore
 mechfight-kit
 mechfight-kit.tar.gz
+sim
+protocol.md
 __pycache__
 *.pyc
 .DS_Store

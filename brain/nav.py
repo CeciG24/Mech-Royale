@@ -133,6 +133,11 @@ class NavGrid:
         w = self.w
         return (w.minx + (I * self.k + self.k // 2) * w.step, w.miny + (J * self.k + self.k // 2) * w.step)
 
+    def center_batch(self, J: np.ndarray, I: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        w = self.w
+        return (w.minx + (I * self.k + self.k // 2) * w.step,
+                w.miny + (J * self.k + self.k // 2) * w.step)
+
     def walkable_at(self, x: float, y: float) -> bool:
         i, j = self.w.ij(x, y)
         return not self._blocked_bytes[j * self.w.nx + i]

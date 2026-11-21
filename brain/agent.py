@@ -192,6 +192,23 @@ class Agent:
             return d + math.hypot(cx - x, cy - y)
         return self.field.dist(x, y)
 
+    def _cells(self, xs: np.ndarray, ys: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        nav = self.nav
+        I = np.clip(np.rint((xs - nav.w.minx) / nav.w.step - nav.k // 2) / nav.k, 0, nav.NX - 1).astype(np.intp)
+        J = np.clip(np.rint((ys - nav.w.miny) / nav.w.step - nav.k // 2) / nav.k, 0, nav.NY - 1).astype(np.intp)
+        return J, I
+
+    def _field_dists(self, f: Optional[NavField], xs: np.ndarray, ys: np.ndarray, fallback: float) -> np.ndarray:
+        if f is None:
+            return np.full(len(xs), fallback)
+        J, I = self._cells(xs, ys)
+        dj, di = J - f.j0, I - f.i0
+        ok = (dj >= 0) & (dj < f.D.shape[0]) & (di >= 0) & (di < f.D.shape[1])
+        out = np.full(len(xs), np.inf)
+        out[ok] = f.D[dj[ok], di[ok]]
+        cx, cy = self.nav.center_batch(J, I)
+        return np.where(np.isfinite(out), out + np.hypot(cx - xs, cy - ys), fallback)
+
     def time_to_edge(self, x: float, y: float) -> float:
         """Seconds until the zone edge passes (x, y) in the current phase (inf if it will not)."""
         z = self.zone
@@ -500,9 +517,9 @@ class Agent:
         nc, nr = zn["next_center"], zn["next_radius"]
         sr = self.safe_radius(nr)
         zc, zr = zn["center"], zn["radius"]
-        fd = np.array([self.field_dist(px, py) for px, py in pts])
         dn = np.hypot(C[:, 0] - nc[0], C[:, 1] - nc[1])
         dc = np.hypot(C[:, 0] - zc[0], C[:, 1] - zc[1])
+        fd = self._field_dists(self.field, C[:, 0], C[:, 1], np.maximum(0.0, dn - sr))
         zcost = np.where(dn > sr, fd, 0.0) * (0.15 + urg * 3.0)
         edge = np.maximum(0.0, dc - (zr - 8.0))
         zcost += P["w_out"] / P["w_zone"] * edge * (1.0 + zn.get("dps", 20) / 30.0)
@@ -522,14 +539,13 @@ class Agent:
             blob.est = True
         srcs = tops + ([blob] if blob is not None else []) + [l for l in locks if l.id < 0]
         danger = np.zeros(n)
+        Jc, Ic = self._cells(C[:, 0], C[:, 1])
         if srcs:
             gz = np.array([self.world.ground_at(px, py) for px, py in pts]) if not on_roof else np.full(n, z)
-            A, B, meta = [], [], []
-            for th in srcs:
-                eye = th.pos + np.array([0.0, 0.0, self.mech["eye_height"]])
-                for k in range(n):
-                    A.append(eye)
-                    B.append((C[k, 0], C[k, 1], gz[k] + 5.5))
+            eh = self.mech["eye_height"]
+            A = np.repeat([th.pos + np.array([0.0, 0.0, eh]) for th in srcs], n, axis=0)
+            B = np.stack([np.tile(C[:, 0], len(srcs)), np.tile(C[:, 1], len(srcs)),
+                          np.tile(gz + 5.5, len(srcs))], axis=1)
             los = self.world.los_batch(A, B, step=2.0).reshape(len(srcs), n)
             for s, th in enumerate(srcs):
                 dx = C[:, 0] - th.pos[0]
@@ -546,8 +562,7 @@ class Agent:
                 prox = 1.0 + 40.0 / np.maximum(d, 15.0)
                 lock = 2.5 if th.charging else 1.0
                 danger += th.conf * wd * exp * seen * prox * lock
-            canopy = np.array([self.nav.canopy[self.nav.cell(px, py)] for px, py in pts])
-            danger *= 1.0 - 0.4 * canopy
+            danger *= 1.0 - 0.4 * self.nav.canopy[Jc, Ic]
             score -= P["w_threat"] * danger
 
         # incoming projectiles
@@ -576,7 +591,7 @@ class Agent:
 
         # walking distance to cover from the current attackers
         if self.cover is not None:
-            cd = np.array([self.cover_dist(px, py) for px, py in pts])
+            cd = self._field_dists(self.cover, C[:, 0], C[:, 1], 80.0)
             score -= P["w_cpath"] * np.minimum(cd, 80.0)
 
         # laser lock or incoming fire: break the line or jink across it
@@ -595,7 +610,7 @@ class Agent:
             score += wj * np.where(dist > 0.1, np.maximum(0.0, ux * px_ + uy * py_), -0.5)
 
         # cover (static) and loot
-        cov = np.array([1.0 - self.nav.openness[self.nav.cell(px, py)] for px, py in pts])
+        cov = 1.0 - self.nav.openness[Jc, Ic]
         wcov = P["w_cover"] * (2.0 if self.mode == "hide" else 1.0)
         score += wcov * cov
         loot = self.loot_targets(obs)
@@ -621,6 +636,12 @@ class Agent:
             d = self.field.steer(x, y)
             if d is not None and score[best] < -1e5 + 1:
                 tx, ty = x + d[0] * 10, y + d[1] * 10
+        if locks and self.cover is not None and urg < 0.5 and self.P.get("lock_cover", 1):
+            cd0 = self.cover_dist(x, y)
+            if 0.0 < cd0 <= 15.0:
+                d = self.cover.steer(x, y)
+                if d is not None and math.hypot(x + d[0] * 10 - zc[0], y + d[1] * 10 - zc[1]) < zr - 4.0:
+                    tx, ty = x + d[0] * 10, y + d[1] * 10
         dx, dy = tx - x, ty - y
         L = math.hypot(dx, dy)
         if L < 0.8:
@@ -665,6 +686,16 @@ class Agent:
                 d = math.dist(p["pos"][:2], (x, y))
                 if d < self.P["loot_radius"] + 10 and abs(p["pos"][2] - z) < 3.5 and self.nav.clear_line(x, y, p["pos"][0], p["pos"][1]):
                     out.append((p["pos"][0], p["pos"][1], 1.5 if p["kind"] == "lightning" else 1.0))
+        if not self.P.get("grab_drops", 1):
+            return out
+        for d in obs.get("drops", []):
+            h = d.get("holder")
+            if (h is not None and h != self.me["id"]) or d.get("lands_in", 99.0) > 6.0:
+                continue
+            dd = math.dist(d["pos"][:2], (x, y))
+            if dd < 55.0 and self.time_to_edge(d["pos"][0], d["pos"][1]) > 14.0 \
+                    and self.nav.clear_line(x, y, d["pos"][0], d["pos"][1]):
+                out.append((d["pos"][0], d["pos"][1], 3.0))
         return out
 
     def plan_take(self, obs: dict) -> dict:
