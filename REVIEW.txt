@@ -1,146 +1,84 @@
-REVISION TECNICA Y CINCO RONDAS - 2026-11-21
+Reevaluación del candidato de práctica — 21 noviembre 2026
 
-Repositorio revisado: https://github.com/ianarce/mech-royale-bot
-Base del companero: fab08268806c7ec7c1122c71f5a1056944ffb890
-Nuestro candidato previo: 6d2ca74b560e35c6ed54719c7f52b3c55770faec
-Destino autorizado: https://github.com/CeciG24/Mech-Royale
-Politica seleccionada: 6eb8d8759bf0dd234999ff769c9b07a6b8a4228f (referencia conservadora con arranque portable)
-Criterio final: validacion conservadora, solicitado expresamente por el usuario.
-Se conserva la politica de decisiones de fab0826: R1 y R4 ganan solo 0.167
-puntos en el holdout de escuadron y pierden 4.00 en el control mixto. La rama
-principal recibe el arranque portable, harness, regresiones e informe; no se
-afirma haber mejorado el placement de esa referencia. La variante de mayor
-puntuacion de entrenamiento se conserva como experimental.
-El repo de destino estaba vacio al inicio; se conserva el historial de la base.
-El commit final de publicacion agrega herramientas e informe; la politica se
-identifica arriba por SHA y por SHA256 en EVALUATION.json.
+Decisión
+Conservar la estrategia de 808e115286c5dfdde8dcca00dddc74e8af92e22f,
+que el usuario reporta con 3.17 oficial. Las cinco variantes nuevas perdieron.
+La rama release/practice-improvement integra esa estrategia sobre el historial
+de CeciG24/Mech-Royale. brain/agent.py coincide exactamente con 808e115.
+bot.py precarga NumPy antes del lector de stdin para evitar un bloqueo observado
+en Windows. Incluye tres pruebas de arranque y fallback y herramientas reproducibles.
+Esto sustituye la estrategia anterior del repo; no demuestra superar 3.17.
 
-CALIFICACION OFICIAL Y EVIDENCIA LOCAL
-El usuario informa 2.67 en la entrega BB-1F649929. No se pudo vincular ese ID
-a un SHA oficial; la busqueda publica por el ID no arrojo resultados.
-Los mensajes de los commits nuevos declaran puntuaciones locales, no oficiales:
-baa67e1 reescribe utilidad/movimiento; a79700f agrega restricciones tacticas;
-fab0826 agrega ofensiva (declara 1.46 sobre 48 semillas locales).
-El 2.67 del candidato anterior de este chat era una medida local sobre seis
-semillas. Al medir ambos con doce semillas nuevas, fab0826 da 1.500
-y 6d2ca74 da 0.583. No se comparan esas medias como si fueran
-calificaciones del leaderboard. El candidato previo tuvo 1 tick tardio en el
-simulador; la base y los cinco candidatos nuevos tuvieron cero.
+Qué prioriza la página
+Fuente: https://www.joinbuilders.org/buildathon/tracks/builders
+La práctica puntúa mean(16 - posición), con 48 semillas privadas fijas y 15 bots
+de casa coordinados (4 fáciles, 4 medios, 4 difíciles y 3 expertos). Comparten
+visión y no se atacan entre ellos; persiguen primero a los débiles y aumentan
+la presión al reducirse el campo. Por tanto, supervivencia y placement frente
+al escuadrón deben decidir la selección. Kills, daño, armas y cubos son diagnósticos,
+no puntos independientes. FFA es una prueba secundaria; usarla como veto principal
+en las rondas anteriores desalineó la selección con la práctica.
 
-HALLAZGOS DE REVISION (priorizados por comportamiento observable)
-P1 - Navegacion, brain/agent.py:_cells: np.rint se aplicaba antes de dividir
-por el tamano de celda, y el cast truncaba el resto. Los costes de zona y
-cobertura consultaban una celda diferente de NavGrid.cell. R1 corrige esto;
-una regresion recorre limites, medias celdas, coordenadas negativas y clipping.
+Qué cambia realmente 808e115 respecto a 9aef75c (2.67 reportado)
+- Amplía loot_r de 120 a 200, activa memoria de loot y evita preferir mortero.
+- Añade el punto exacto del arma deseada (o un paso de 16 m hacia ella) a los
+  candidatos: los anillos anteriores no garantizaban caer dentro del radio de 4 m.
+- Da prioridad fuerte a acercarse al arma y permite recogerla bajo fuego.
+- Conserva distancia preferida de pistola de 115 m y compromiso direccional.
+Los modos ambush, duel y surv están desactivados por defecto; no explican 3.17.
+Esta revisión identifica diferencias, no una prueba causal de cada cambio.
 
-P1 - Visibilidad frente a punteria, _shot_clear/weapon_choice: se daba por
-valido un tiro si veia pies, torso O cabeza, pero se apuntaba al torso aunque
-estuviera cubierto. R4 usa un punto expuesto, con torso como primera opcion,
-y evita el tiro si ya no queda ningun punto libre. Tiene tres regresiones.
-Su buen entrenamiento no basta para afirmar mejora general: falla la
-validacion mixta y acumula mas ticks de poca movilidad en el holdout.
+Comparación reproducible
+24 semillas de entrenamiento 1001..1024 por candidato, mismas posiciones iniciales
+verificadas por hash, rivales y motor congelado en 808e115. Python 3.12.6,
+NumPy 2.2.2, PYTHONHASHSEED=0, dos procesos concurrentes; presupuestos reales
+de reloj. No se usó el modo diagnóstico de trabajo fijo.
+Métrica: media de (16 - posición). Delta frente al mejor conservado (referencia).
 
-P2 - Entrada portable, bot.py: importar NumPy despues de arrancar el lector
-stdin bloquea el arranque en Windows. La base falla ready/20 s alli; en Linux
-pasa con p99 8.3 ms. La preparacion 6eb8d87 precarga NumPy y mantiene el
-respaldo si la dependencia falla. No modifica las decisiones in-process.
+Ronda                                        Media  Delta Tarde Decisión
+base                                        4.083 +0.000    0 Referencia elegida
+1: rutas de armas                           3.542 -0.542    1 Descartado
+2: destinos exactos de cubos                3.125 -0.958    0 Descartado
+3: memoria fresca de armas + rutas          3.875 -0.208    0 Descartado
+4: suspender farmeo con poca vida           3.583 -0.500    0 Descartado
+5: esquiva con radio y velocidad reales     3.000 -1.083    0 Descartado
 
-P2 - Inventario, plan_take: bloquear la recogida en duelo no esta justificado
-por el tiempo de equipar el slot nuevo; el gun sigue disponible. R2 prueba
-permitirlo, pero empata la puntuacion y aumenta atascos; no se conserva.
+Todos tuvieron cero errores y cero ticks de fallback. La ronda 1 tuvo un tick
+tardío y además perdió placement. Más armas o cubos no compensaron las muertes:
+la ruta elevó adquisición de segunda arma de 83.3% a 87.5%, pero perdió puntos;
+la ronda de cubos elevó cubos de 2.08 a 2.63 y aun así cayó a 3.125.
+Cada candidato descartado conserva commit y tag local practice-317-*.
 
-P2 - Rotacion y laser: cargar reduce velocidad a la mitad. R3 prueba usar gun
-y soltar la carga al rotar con urgencia. Empeora placement y tiempo fuera de
-zona; se descarta. El argumento mecanico solo no demuestra mejora tactica.
+Validación reservada
+Solo se abrió después de cerrar la selección: semillas 1101..1124 de la referencia,
+media 3.333, cero ticks tardíos, errores o fallback.
+No se usó para rescatar variantes perdedoras ni ajustar parámetros.
+El p99 de Agent.act no equivale al p99 de ida y vuelta del checker.
 
-P2 - Desatasco: la salida aleatoria puede apuntar de nuevo a una pared. R5
-prueba rayos libres antes de saltar. Reduce atascos de 148 a 114 en entrenamiento,
-pero baja de 3.00 a 2.42 puntos; se descarta por la metrica principal.
-
-P2 - Riesgos pendientes: la grilla usa la dimension inicial aunque los cubos
-agrandan el mech; el coste de riesgo se satura en crossfire intenso; el
-presupuesto interno tiene chequeos parciales, no un limite duro para todo act().
-No se cambiaron estas partes dentro de las cinco rondas.
-
-DISENO DE PRUEBAS
-Metrica primaria: media de (16 - posicion), 12 semillas por candidato.
-Entrenamiento: 301..312. Validacion reservada: 401..412. Control mixto: 501..504.
-Mismos rivales HouseBot, roles, semillas y spawns por comparacion. Motor,
-HouseBot, World y NavGrid son iguales entre bases; solo sim/run.py cambio su
-CLI a squad por defecto. Nuestro harness usa Match directamente y declara el
-modo. Cada semilla arranca en proceso nuevo para evitar caches entre partidas;
-dos trabajos concurrentes. Se verifican hashes de estados iniciales y de los
-archivos comunes del simulador. Se usa Bot real, no Agent aislado, para contar
-inicializacion de respaldo, excepciones y ticks que activan el respaldo.
-Rivales y fisica son una aproximacion local no oficial. El protocolo dice
-free-for-all; la cooperacion de HouseBot en --squad es una hipotesis de prueba,
-no una propiedad oficial verificada del servidor. La prueba mixta es un control
-necesario contra especializarse en ese modelo.
-
-RESULTADOS DE LAS CINCO RONDAS
- R  SHA      Media  Delta*  p99ms  Late Decision de entrenamiento
- 1  992be99   2.33  +0.83   10.8    0  guardar
- 2  0558601   2.33  +0.00   13.2    0  descartar
- 3  f91c5d2   2.17  -0.17    8.8    0  descartar
- 4  ad15fe5   3.00  +0.67   14.7    0  guardar
- 5  466afdc   2.42  -0.58    5.7    0  descartar
-*Delta contra mejor candidato anterior, no siempre contra la ronda previa.
-En empates se conserva la version mas simple. Se guardan tags team-round-1..5.
-R2 y R3 parten de R1; R4 parte de R1; R5 parte de R4. Un commit por candidato.
-Todos: cero errores de simulacion, cero respaldo, cero ticks tardios en sim,
-y PASS en checker Docker con cero respuestas fuera de 50 ms.
-R5 emite una respuesta a una observacion antigua en una rafaga; el checker la
-descarta, recibe la ultima a tiempo y valida PASS. No hay ticks incorrectos.
-
-VALIDACION (no se volvieron a ajustar parametros tras verla)
-round4_squad    base=2.333 candidato=2.500 delta=+0.167 IC95 bootstrap pareado=[-0.9166666666666666, 1.25]
-round4_mix      base=14.000 candidato=10.000 delta=-4.000 IC95 bootstrap pareado=[-7.75, -0.5]
-round1_squad    base=2.333 candidato=2.500 delta=+0.167 IC95 bootstrap pareado=[-2.3333333333333335, 2.6666666666666665]
-round1_mix      base=14.000 candidato=10.000 delta=-4.000 IC95 bootstrap pareado=[-7.75, -0.5]
-R4 se eligio por entrenamiento antes de abrir el holdout. Ante la regresion
-mixta se valido tambien R1, sin implementar otro cambio: son cinco rondas de
-codigo y una comprobacion adicional de un candidato ya existente. Esto ya no
-es una unica eleccion ciega sobre el holdout: hay sesgo de seleccion y las
-muestras son pequenas. Los intervalos son descriptivos, no garantia estadistica.
-R1 tuvo 1 tick tardio en su validacion adicional local; las cinco rondas de
-entrenamiento y las validaciones de R4 tuvieron cero. Los contadores completos
-estan incluidos junto a las medias; el checker Docker paso para todos.
-Las decisiones y deltas por semilla estan en EVALUATION.json.
-
-CHECKER OFICIAL Y CONTENEDOR
-Kit/checker/protocolo suministrados, sin modificar schema, flujo ni presupuesto.
-tools/check_docker.py solo adapta abspath('/arena') en el host Windows; sin
-esa adaptacion el checker enviaria una ruta Windows a un contenedor Linux.
-Cada candidato fue construido y probado con linux/amd64, --network none,
---cpus 1, --memory 512m, --memory-swap 512m, --pids-limit 128, --cap-drop ALL,
---read-only, --tmpfs /tmp:rw,size=64m, --user 65534:65534 y mapa :ro.
-Se verifico dentro del contenedor: {"uid": 65534, "python": "3.13.18", "numpy": "2.4.3", "cpu.max": "100000 100000", "memory.max": "536870912", "memory.swap.max": "0", "pids.max": "128"}.
-p99 de la tabla mide ida y vuelta por pipes y Docker, no solo tiempo de act().
-La frase estatica del checker '(this machine, not the 1-CPU match container)'
-no describe la invocacion real de estos logs: el bot si estaba limitado a
-un CPU. El tiempo medido incluye transporte por el host.
-La publicacion final se vuelve a comprobar con tools/retest.py --docker.
-Pasar el checker demuestra protocolo/latencia de ese replay, no placement.
-
-REPRODUCIR (desde la raiz del repo, con Python 3)
+Reproducir desde el checkout con el kit disponible
 python tools/retest.py --docker --check-only
-python tools/batch.py --squad --seeds 301,302,303,304,305,306,307,308,309,310,311,312 --jobs 2 --out evaluation-retest.json
-python tools/batch.py --squad --seeds 401,402,403,404,405,406,407,408,409,410,411,412 --jobs 2 --out validation-retest.json
-python tools/batch.py --opp mix --seeds 501,502,503,504 --jobs 2 --out mixed-retest.json
-La simulacion local requiere NumPy (seleccion realizada con 2.2.2 en Python
-3.12.6); la imagen construye NumPy 2.4.3 y Python 3.13-slim. El checker host
-usa solo stdlib. --docker --check-only ejecuta las regresiones dentro de la
-imagen y no necesita NumPy instalado en el host.
+python tools/batch.py --bot-root . --engine-root . --squad --seeds 1001,1002,1003,1004,1005,1006,1007,1008,1009,1010,1011,1012,1013,1014,1015,1016,1017,1018,1019,1020,1021,1022,1023,1024 --jobs 2 --out evaluation-retest.json
+Para validación sustituir semillas por 1101..1124. Para comparar actores distintos,
+mantener --engine-root apuntando al mismo checkout de 808e115 en ambas ejecuciones.
+tools/check_docker.py ejecuta el checker oficial sin modificar su protocolo ni
+cronómetro; solo preserva /arena como ruta POSIX en el host Windows.
 
-QUE FALLO / QUE SIGUE SIN VERIFICAR
-R2 no mejoro; R3 y R5 empeoraron; R4 sobreajusta el modelo de escuadron y falla
-en el control mixto. La calificacion oficial y su SHA siguen sin verificarse.
-Queda sin probar el placement real, latencia en toda la distribucion de
-observaciones del servidor y estres maximo de proyectiles, mas alla del replay.
-No se hizo ningun envio al leaderboard.
+Límites y siguiente hipótesis
+No están disponibles el simulador oficial offline ni las 48 semillas privadas.
+El simulador local aproxima el escuadrón; su ranking ya falló al recomendar
+ad15fe5, que obtuvo 2.37 real. Los relojes internos introducen variación adicional.
+No se verificó ninguna puntuación oficial nueva ni se envió al leaderboard.
+Si la siguiente entrega no mejora, revisar replays de muertes por presión conjunta
+y probar desacoplar el bonus de recoger armas cuando impida escapar de varios
+cazadores. La restricción genérica de rutas ya perdió; exigir evidencia de replays
+y validar una sola condición de presión, sin otra búsqueda extensa de pesos.
 
-SIGUIENTE HIPOTESIS
-Comprobar clearance con el radio real al crecer por cubos, especialmente en
-las semillas con atascos prolongados. Mantener los fixes por separado y medir
-ambos modos desde el inicio; no elegir por unicamente los seis mejores seeds
-ni conservar cambios solo porque su razonamiento parece correcto.
+Checker final en Docker
+PASS: 300/300 observaciones respondidas dentro de 50 ms; cero ticks tardíos,
+wrong tick o líneas inválidas. p99 ida y vuelta 13.7 ms, máximo 14.7 ms.
+Una respuesta de una observación anterior fue descartada (el checker permite
+este comportamiento de la cola); no hubo respuesta tardía. Tres tests de
+arranque/fallback pasaron dentro del contenedor. Linux/amd64, 1 CPU, 512 MB,
+128 procesos, sin red, solo lectura, UID 65534, /tmp de 64 MB.
+La medición de ida y vuelta depende de este host; no es una puntuación de placement.
+El contenedor se construyó con el código final; después solo se actualizaron informes.
