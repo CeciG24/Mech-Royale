@@ -264,8 +264,8 @@ class Agent:
 
     def _cells(self, xs: np.ndarray, ys: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         nav = self.nav
-        I = np.clip(np.rint((xs - nav.w.minx) / nav.w.step - nav.k // 2) / nav.k, 0, nav.NX - 1).astype(np.intp)
-        J = np.clip(np.rint((ys - nav.w.miny) / nav.w.step - nav.k // 2) / nav.k, 0, nav.NY - 1).astype(np.intp)
+        I = np.clip(np.rint(((xs - nav.w.minx) / nav.w.step - nav.k // 2) / nav.k), 0, nav.NX - 1).astype(np.intp)
+        J = np.clip(np.rint(((ys - nav.w.miny) / nav.w.step - nav.k // 2) / nav.k), 0, nav.NY - 1).astype(np.intp)
         return J, I
 
     def _field_dists(self, f: Optional[NavField], xs: np.ndarray, ys: np.ndarray, fallback) -> np.ndarray:
