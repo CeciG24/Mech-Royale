@@ -36,8 +36,20 @@ PHASE_W = {
     "mid": dict(zone=18, cross=25, aoe=12, trap=11, kin=7, cover=19, dist=3, loot=1, space=4),
     "final": dict(zone=20, cross=14, aoe=14, trap=9, kin=12, cover=11, dist=16, loot=2, space=2),
 }
+# Offensive profile: weight moved from crossfire/cover/escape to weapon range and loot so the bot
+# closes on hunters, drones and crates (every kill is a mech that dies before us).
+PHASE_W_OFF = {
+    "early": dict(zone=14, cross=16, aoe=10, trap=8, kin=6, cover=10, dist=18, loot=12, space=6),
+    "mid": dict(zone=18, cross=15, aoe=11, trap=7, kin=7, cover=10, dist=20, loot=8, space=4),
+    "final": dict(zone=20, cross=14, aoe=14, trap=9, kin=12, cover=11, dist=16, loot=2, space=2),
+}
 
 DEFAULTS = {
+    "style": "offense",      # "offense" hunts kills, drones and crates; "defense" is the document's practice variant
+    "farm_r": 110.0,         # offense: engage idle drones within this range
+    "crate_r": 70.0,         # offense: shoot crates within this range when nothing else is in sight
+    "chase_s": 5.0,          # offense: keep closing on a mech seen this recently
+    "fire_min_off": 0.2,     # offense: trigger threshold on S_target
     "budget_s": 0.022,       # internal compute budget per tick (document: 20-25 ms)
     "alpha_h": 0.50,         # a(h) activates below this HP fraction (practice variant)
     "gamma": 1.25,           # a(h) = 1 + gamma (1 - h)
@@ -171,6 +183,11 @@ class Agent:
         self.look_age = np.zeros(NDIR)
         self.mode = "early"
         self.t = 0.0
+        self.offense = self.P.get("style") == "offense"
+        self.crates: List[dict] = []
+        self.rear_hits: List[Tuple[float, float, Optional[int]]] = []
+        self.flip = 1.0
+        self.flip_t = 0.0
 
     def _escape_map(self) -> np.ndarray:
         """Fraction of the 8 directions with at least two walkable steps (8 m) from each cell."""
@@ -193,6 +210,7 @@ class Agent:
         self.pos = np.array(me["pos"], dtype=float)
         self.zone = obs["zone"]
         self.alive = int(obs.get("alive", 16))
+        self.crates = obs.get("crates", [])
         a: dict = {}
         if obs.get("offer"):
             a["pick"] = self.pick_upgrade(obs["offer"])
@@ -336,6 +354,9 @@ class Agent:
                 self.last_hit_t = t
                 if e.get("bearing") is not None:
                     self.last_dmg_bearing = (e["bearing"], t)
+                    if e.get("rear"):
+                        self.rear_hits = [r for r in self.rear_hits if t - r[1] < 2.0]
+                        self.rear_hits.append((e["bearing"], t, e.get("by")))
                 by = e.get("by")
                 if by is not None:
                     self.attackers[by] = t
@@ -383,6 +404,27 @@ class Agent:
                 continue
             out.append(th)
         return out
+
+    def prey(self) -> List[Threat]:
+        """Fire candidates: the enemies, plus (offense) idle drones in range for their 2 cubes."""
+        out = self.enemies()
+        if self.offense:
+            ids = {th.id for th in out}
+            for th in self.threats.values():
+                if th.id >= 100 and th.id not in ids and not th.est and self.t - th.seen < 0.3 \
+                        and math.dist(th.pos[:2], self.pos[:2]) <= self.P["farm_r"]:
+                    out.append(th)
+        return out
+
+    def chase_target(self) -> Optional[Threat]:
+        """Offense: the nearest squad mech seen in the last chase_s seconds (tracked through cover)."""
+        best, bd = None, 1e9
+        for th in self.threats.values():
+            if 0 <= th.id < 100 and not th.est and self.t - th.seen < self.P["chase_s"]:
+                d = math.dist(th.pos[:2], self.pos[:2])
+                if d < bd and d < 230:
+                    best, bd = th, d
+        return best
 
     def aims_at_me(self, th: Threat, memory: float = 1.5) -> bool:
         if self.t - self.attackers.get(th.id, -1e9) < memory:
@@ -490,7 +532,8 @@ class Agent:
         mh = self.me["stats"].get("muzzle_height", self.mech.get("muzzle_height", 7.0))
         muzzle = self.pos + np.array([0.0, 0.0, mh])
         scored: Dict[int, Tuple[float, Threat, bool]] = {}
-        for th in self.enemies():
+        any_mech = any(0 <= th.id < 100 and not th.est and self.t - th.seen < 0.3 for th in self.threats.values())
+        for th in self.prey():
             if th.est or self.t - th.seen > 0.3:
                 continue
             d = math.dist(th.pos[:2], self.pos[:2])
@@ -510,6 +553,8 @@ class Agent:
             s = P["u_hit"] * hit + P["u_finish"] * (1.0 - th.hp / max(1.0, th.max_hp)) \
                 + P["u_counter"] * counter + P["u_duel"] * self.aims_at_me(th, memory=8.0) \
                 - P["u_obst"] * obst
+            if th.id >= 100 and any_mech:
+                s -= 0.4  # a squad mech in sight outranks a drone
             scored[th.id] = (s, th, clear)
         if not scored:
             self.target_id = None
@@ -587,7 +632,7 @@ class Agent:
         me = self.me
         x, y, z = self.pos
         hp = me["hp"] / max(1.0, me["max_hp"])
-        W = PHASE_W[self.mode]
+        W = (PHASE_W_OFF if self.offense else PHASE_W)[self.mode]
         alpha = 1.0 + P["gamma"] * (1.0 - hp) if hp < P["alpha_h"] else 1.0
         beta = hp
         on_roof = z > self.world.ground_at(x, y) + 2.5
@@ -744,6 +789,10 @@ class Agent:
 
         # ---------------------------------------------------------- f_dist
         f_dist = np.zeros(n)
+        if target is None and self.offense:
+            ch = self.chase_target()
+            if ch is not None:
+                target = (ch, 0.0, False)
         if target is not None:
             th = target[0]
             ready = [w for w in me["weapons"] if w]
@@ -761,6 +810,17 @@ class Agent:
                     ropt = max(ropt, 60.0)  # stay outside their 45 m arc
                 dt = np.hypot(X - th.pos[0], Y - th.pos[1])
                 f_dist = np.exp(-((dt - ropt) ** 2) / (2 * sig * sig))
+                if self.offense and not th.est and self.t - th.seen < 0.5:
+                    # strafe across the line of fire, flipping side every 0.5-0.9 s, so bullets
+                    # aimed at us miss while we keep shooting
+                    if self.t > self.flip_t:
+                        self.flip = -self.flip
+                        self.flip_t = self.t + self.rng.uniform(0.5, 0.9)
+                    bx, by = x - th.pos[0], y - th.pos[1]
+                    Lb = math.hypot(bx, by) or 1.0
+                    px_, py_ = -by / Lb * self.flip, bx / Lb * self.flip
+                    side = np.clip(ux * px_ + uy * py_, 0.0, 1.0) * (dist > 0.1)
+                    f_dist = 0.6 * f_dist + 0.4 * side
 
         # ---------------------------------------------------------- f_loot
         f_loot = np.zeros(n)
@@ -846,6 +906,11 @@ class Agent:
                 q = p["pos"]
                 if math.dist(q[:2], (x, y)) < 120 and abs(q[2] - z) < 3.5:
                     out.append((q[0], q[1], pref[p["kind"]]))
+        if self.offense and cubes < 10:
+            for c in obs.get("crates", []):
+                q = c["pos"]
+                if math.dist(q[:2], (x, y)) < 120:
+                    out.append((q[0], q[1], 0.6))
         for d in obs.get("drops", []):
             h = d.get("holder")
             lands = float(d.get("lands_in", 99.0))
@@ -886,6 +951,15 @@ class Agent:
         eye = (x, y, z + me["stats"].get("muzzle_height", self.mech.get("muzzle_height", 7.0)))
         weapons = me["weapons"]
         kinds = [w["kind"] if w else None for w in weapons]
+        rear = [r for r in self.rear_hits if t - r[1] < 1.2]
+        if len(rear) >= 2 and (target is None or (rear[-1][2] != target[0].id
+                                                  and target[0].hp / max(1.0, target[0].max_hp) > 0.3)):
+            # taking x1.5 hits from behind: turn the front arc to that attacker and shoot back
+            src = self.threats.get(rear[-1][2]) if rear[-1][2] is not None else None
+            if src is not None and self.t - src.seen < 5.0 and not src.est:
+                return self.weapon_choice(src, weapons, kinds, eye, math.dist(src.pos[:2], (x, y)), False,
+                                          self._shot_clear(np.array(eye), src))
+            return [rear[-1][0], 0.0], [False, False]
         if target is not None:
             th, s, clear = target
             d = math.dist(th.pos[:2], (x, y))
@@ -893,13 +967,18 @@ class Agent:
             lob = "mortar" in kinds and 25.0 <= d <= 235.0
             # regen discipline: hurt, no finish in sight and not under fire -> no speculative long shots
             hp = me["hp"] / max(1.0, me["max_hp"])
-            idle_shot = hp < self.P["regen_hp"] and d > 120 and not self.aims_at_me(th, memory=8.0) \
-                and th.hp / max(1.0, th.max_hp) > 0.3
-            if ((s >= self.P["fire_min"] and (clear or lob)) or short) and not idle_shot:
+            idle_shot = not self.offense and hp < self.P["regen_hp"] and d > 120 \
+                and not self.aims_at_me(th, memory=8.0) and th.hp / max(1.0, th.max_hp) > 0.3
+            fmin = self.P["fire_min_off"] if self.offense else self.P["fire_min"]
+            if ((s >= fmin and (clear or lob)) or short) and not idle_shot:
                 return self.weapon_choice(th, weapons, kinds, eye, d, short, clear)
             return list(yaw_pitch(eye, (th.pos[0], th.pos[1], th.pos[2] + 4.5))), [False, False]
         # no firing target: keep the front arc toward the most dangerous known enemy
         enemies = self.enemies()
+        if self.offense and not locks and "gun" in kinds:
+            crate = self.crate_shot(eye, enemies)
+            if crate is not None:
+                return crate
         if locks:
             th = min(locks, key=lambda l: math.dist(l.pos[:2], self.pos[:2]))
             return list(yaw_pitch(eye, (th.pos[0], th.pos[1], th.pos[2] + 4.5))), [False, False]
@@ -915,6 +994,33 @@ class Agent:
             if t - b[2] < 4.0:
                 return [math.atan2(b[1] - y, b[0] - x), 0.0], [False, False]
         return self.scan(me), [False, False]
+
+    def crate_shot(self, eye, enemies):
+        """Offense: break the nearest visible crate (1 cube, 50% weapon) when no mech is close."""
+        if self.me.get("cubes", 0) >= 10 or not self.crates:
+            return None
+        if any(0 <= th.id < 100 and self.t - th.seen < 3.0 and math.dist(th.pos[:2], self.pos[:2]) < 150
+               for th in enemies):
+            return None
+        x, y, _ = self.pos
+        best, bd = None, self.P["crate_r"]
+        for c in self.crates:
+            d = math.dist(c["pos"][:2], (x, y))
+            if d < bd:
+                best, bd = c, d
+        if best is None:
+            return None
+        tgt = (best["pos"][0], best["pos"][1], best["pos"][2] + 1.2)
+        if not bool(self.world.los_batch([eye], [tgt], step=1.0)[0]):
+            return None
+        kinds = [w["kind"] if w else None for w in self.me["weapons"]]
+        s = kinds.index("gun")
+        w = self.me["weapons"][s]
+        aim = list(yaw_pitch(eye, tgt))
+        err = abs(wrap(aim[0] - self.me["aim"][0])) + abs(aim[1] - self.me["aim"][1])
+        fire = [False, False]
+        fire[s] = err < max(0.02, math.atan2(1.0, max(bd, 1.0))) and w.get("ammo", 1) > 0
+        return aim, fire
 
     def _mortar_aim(self, th: Threat, w: dict) -> Optional[List[float]]:
         """Ballistic elevation from the tube (pos.z + 9.5) onto the target's feet; prefer the
