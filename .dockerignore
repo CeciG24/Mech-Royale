@@ -8,3 +8,6 @@ protocol.md
 __pycache__
 *.pyc
 .DS_Store
+evaluation-retest*
+validation-retest*
+mixed-retest*

@@ -17,7 +17,7 @@ def main():
     ap.add_argument('--docker',action='store_true')
     ap.add_argument('--image',default='mech-royale-review:best')
     ap.add_argument('--check-only',action='store_true')
-    ap.add_argument('--seeds',default=','.join(map(str,range(301,313))))
+    ap.add_argument('--seeds',default=','.join(map(str,range(1001,1025))))
     ap.add_argument('--jobs',type=int,default=2)
     ap.add_argument('--out',default=str(ROOT/'evaluation-retest.json'))
     a = ap.parse_args()
@@ -34,7 +34,8 @@ def main():
         run([sys.executable,'-m','unittest','discover','-s','tests','-v'])
         run([sys.executable,'mechfight-kit/check/check.py','--',sys.executable,'-u','bot.py'])
     if not a.check_only:
-        run([sys.executable,'tools/batch.py','--squad','--seeds',a.seeds,'--jobs',str(a.jobs),'--out',a.out])
+        run([sys.executable,'tools/batch.py','--bot-root',ROOT,'--engine-root',ROOT,
+             '--squad','--seeds',a.seeds,'--jobs',str(a.jobs),'--out',a.out])
 
 
 if __name__ == '__main__':

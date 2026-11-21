@@ -2,3 +2,6 @@ __pycache__/
 *.py[cod]
 .DS_Store
 mechfight-kit.tar.gz
+/evaluation-retest*
+/validation-retest*
+/mixed-retest*
