@@ -78,10 +78,36 @@ DEFAULTS = {
     "w_commit": 20.0,
     "dodge_boost_r": 0.0,
     "w_arc": 0.0,
-    "loot_r": 120.0,
-    "loot_mem": 0,
-    "mortar_ok": 1,
+    "loot_r": 200.0,
+    "loot_mem": 1,
+    "mortar_ok": 0,
     "swap_mortar": 0,
+    "aim_tol": 2.2,
+    "w_keep": 0.0,           # sniper: penalty for spots inside keep_r of any squad mech
+    "keep_r": 120.0,          # gun fires when the aim error is within atan(aim_tol / d)
+    "ambush": 0,             # hide from far hunters (squad forgets us after ~8 s unseen), fight them up close
+    "amb_r": 70.0,           # a squad mech in sight inside this range ends the hiding
+    "amb_cov": 2.5,          # cover weight multiplier while hiding
+    "amb_dist": 0.2,         # range-keeping weight multiplier while hiding
+    "w_hold": 0.0,           # bonus for staying put on a covered spot while hiding
+    "duel": 0,               # one hunter in play: close in, keep it under fire and finish it
+    "duel_r": 60.0,          # gun range while dueling
+    "duel_w": 2.0,           # range-keeping weight multiplier while dueling
+    "duel_cov": 0.5,         # cover/crossfire weight multiplier while dueling
+    "duel_hp": 0.5,          # only duel above this HP fraction
+    "duel_n": 1,             # duel while at most this many squad mechs were seen in the last 5 s
+    "duel_boost": 1,         # boost to close the gap while dueling
+    "surv": 0,               # survival: drift to the next zone centre, fight only when engaged
+    "w_center": 15.0,        # survival: weight of closeness to the next zone centre
+    "surv_dist": 0.3,        # survival: range-keeping weight multiplier
+    "surv_fire_r": 100.0,    # survival: hold fire beyond this range unless that mech shot us in the last 8 s
+    "grab": 1,               # walk straight onto a wanted weapon pickup (rings never land within 4 m)
+    "grab_r": 80.0,          # grab pickups this close
+    "w_grab": 40.0,          # utility of closing on the grab point
+    "grab_safe": 0,          # only grab when no gunner is within 100 m
+    "take_any": 1,           # take the weapon even with a shooter aiming at us
+    "amb_urg": 0.4,          # stop hiding once zone urgency reaches this
+    "amb_fire_r": 999.0,     # while hiding, hold fire beyond this range unless shot recently
 }
 
 # (1) universal survival: armor/HP/regen, mobility and energy; (2) sensors; (3) main weapon.
@@ -653,7 +679,7 @@ class Agent:
         me = self.me
         x, y, z = self.pos
         hp = me["hp"] / max(1.0, me["max_hp"])
-        W = (PHASE_W_OFF if self.offense else PHASE_W)[self.mode]
+        W = {k: v * P.get("wm_" + k, 1.0) for k, v in (PHASE_W_OFF if self.offense else PHASE_W)[self.mode].items()}
         alpha = 1.0 + P["gamma"] * (1.0 - hp) if hp < P["alpha_h"] else 1.0
         beta = hp
         on_roof = z > self.world.ground_at(x, y) + 2.5
@@ -679,10 +705,49 @@ class Agent:
         dmeE = {th.id: math.dist(th.pos[:2], (x, y)) for th in enemies}
         pnow = {th.id: float(self.pressure(th, np.array([dmeE[th.id]]))[0]) * th.conf for th in enemies}
         srcs = [th for th in sorted(enemies, key=lambda th: -pnow[th.id]) if pnow[th.id] > 0.005][:4]
+        self.hiding = bool(P["ambush"]) and self.t - self.last_hit_t > 2.0 and me.get("in_zone", True) \
+            and self.zone_urgency() < P["amb_urg"] and not any(
+            th.id < 100 and not th.est and self.t - th.seen < 0.5 and dmeE[th.id] < P["amb_r"] for th in enemies)
+        fresh = [th for th in enemies if th.id < 100 and not th.est and self.t - th.seen < 5.0]
+        self.dueling = bool(P["duel"]) and 0 < len(fresh) <= P["duel_n"] and hp > P["duel_hp"] \
+            and me.get("in_zone", True) and self.zone_urgency() < 0.5
+        duel_th = min(fresh, key=lambda th: dmeE[th.id]) if self.dueling else None
+        if self.dueling:
+            W["dist"] *= P["duel_w"]
+            W["cover"] *= P["duel_cov"]
+            W["cross"] *= P["duel_cov"]
+        if P["surv"]:
+            W["dist"] *= P["surv_dist"]
+        if self.hiding:
+            W["cover"] *= P["amb_cov"]
+            W["dist"] *= P["amb_dist"]
         if time.perf_counter() < self.deadline:
             self.update_cover([th for th in srcs if th.conf >= 0.5][:2])
 
+        self.grab_pt = None
+        if P["grab"]:
+            kinds0 = [w["kind"] if w else None for w in me["weapons"]]
+            pref0 = self.weapon_pref(kinds0)
+            busy = P["grab_safe"] and any(th.id < 100 and not th.est and self.t - th.seen < 1.0
+                                          and dmeE[th.id] < 100.0 for th in enemies)
+            if pref0 and not busy:
+                best_g = None
+                for pk in obs.get("pickups", []):
+                    if pk["kind"] in kinds0 or pk["kind"] not in pref0 or abs(pk["pos"][2] - z) > 3.5:
+                        continue
+                    dg = math.dist(pk["pos"][:2], (x, y))
+                    if dg < P["grab_r"] and (best_g is None or dg < best_g[0]):
+                        best_g = (dg, (float(pk["pos"][0]), float(pk["pos"][1])))
+                if best_g is not None:
+                    self.grab_pt = best_g[1]
         pts = self.candidates()
+        if self.grab_pt is not None:
+            gx, gy = self.grab_pt
+            dg0 = math.dist(self.grab_pt, (x, y))
+            if dg0 > 16.0:
+                pts.append((x + (gx - x) / dg0 * 16.0, y + (gy - y) / dg0 * 16.0))
+            else:
+                pts.append(self.grab_pt)
         n = len(pts)
         C = np.array(pts)
         X, Y = C[:, 0], C[:, 1]
@@ -834,8 +899,17 @@ class Agent:
                     dl = np.hypot(X - th.pos[0], Y - th.pos[1])
                     f_arc = np.maximum(f_arc, np.clip((62.0 - dl) / 20.0, 0.0, 1.0))
 
+        # sniper spacing: fight from range, never let a hunter inside keep_r
+        f_keep = np.zeros(n)
+        if P["w_keep"] > 0:
+            for th in enemies:
+                if th.id < 100 and self.t - th.seen < 4.0:
+                    dk = np.hypot(X - th.pos[0], Y - th.pos[1])
+                    f_keep = f_keep + np.clip((P["keep_r"] - dk) / P["keep_r"], 0.0, 1.0)
         # ---------------------------------------------------------- f_dist
         f_dist = np.zeros(n)
+        if duel_th is not None and (target is None or target[0].id >= 100):
+            target = (duel_th, 0.0, False)
         if target is None and self.offense:
             ch = self.chase_target()
             if ch is not None:
@@ -851,7 +925,7 @@ class Agent:
             if best_k is not None:
                 ropt, sig = R_OPT[best_k]
                 if best_k == "gun":
-                    ropt = P["gun_ropt"]
+                    ropt = P["duel_r"] if self.dueling else P["gun_ropt"]
                 w = next(w for w in ready if w["kind"] == best_k)
                 if w.get("reload", 0) > 0 or (best_k == "laser" and w.get("cooldown", 0) > 0.3):
                     ropt += R_COOL
@@ -899,7 +973,14 @@ class Agent:
         U = (- W["zone"] * f_zone - W["cross"] * alpha * f_cross - W["aoe"] * f_aoe
              - W["trap"] * f_trap - W["kin"] * f_kin + W["cover"] * alpha * f_cover
              + W["dist"] * f_dist + W["loot"] * beta * f_loot + W["space"] * f_space
-             + P["w_dodge"] * f_dodge - P["w_arc"] * f_arc)
+             + P["w_dodge"] * f_dodge - P["w_arc"] * f_arc - P["w_keep"] * f_keep)
+        if self.grab_pt is not None:
+            dgc = np.hypot(X - self.grab_pt[0], Y - self.grab_pt[1])
+            U = U + P["w_grab"] * np.clip(1.0 - dgc / max(math.dist(self.grab_pt, (x, y)), 1.0), 0.0, 1.0)
+        if P["surv"]:
+            U = U + P["w_center"] * np.clip(1.0 - dn / max(nr, 1.0), 0.0, 1.0)
+        if self.hiding and P["w_hold"] > 0:
+            U = U + P["w_hold"] * f_cover * (dist < 1.5) + W["kin"] * 0.4 * still
         # under fire, hold a direction for 0.6-1.1 s: flipping every tick cancels our speed
         # (58.5 m/s^2 takes 0.4 s to reverse 11.7 m/s), so even unled shots keep landing
         committed = gunners and self.commit_dir is not None and self.t < self.commit_until
@@ -932,6 +1013,9 @@ class Agent:
         threatened = bool(locks or incoming or shooter_near)
         boost = me["energy"] > P["energy_reserve"] and (
             threatened or urg >= 1.0 or not me.get("in_zone", True))
+        if duel_th is not None and P["duel_boost"] and dmeE[duel_th.id] > P["duel_r"] + 15 \
+                and me["energy"] > 20 and h[0] * (duel_th.pos[0] - x) + h[1] * (duel_th.pos[1] - y) > 0:
+            boost, mag = True, 1.0
         if gunners and min(dmeE[th.id] for th in gunners) < P["dodge_boost_r"] and me["energy"] > 15:
             boost, mag = True, 1.0
         # acoustic stealth: no combat in sight and no zone pressure -> walk at <= 5 m/s, no boost
@@ -1010,7 +1094,8 @@ class Agent:
         want = self.weapon_pref(kinds)
         if not want:
             return {}
-        if target is not None and self.aims_at_me(target[0]) and math.dist(target[0].pos[:2], (x, y)) < 120:
+        if not self.P["take_any"] and target is not None and self.aims_at_me(target[0]) \
+                and math.dist(target[0].pos[:2], (x, y)) < 120:
             return {}
         reach = (self.cfg.get("loot") or {}).get("pickup_radius", 4.0) - 0.3
         pref = {k: -v for k, v in want.items()}
@@ -1058,6 +1143,10 @@ class Agent:
             idle_shot = not self.offense and hp < self.P["regen_hp"] and d > 120 \
                 and not self.aims_at_me(th, memory=8.0) and th.hp / max(1.0, th.max_hp) > 0.3
             fmin = self.P["fire_min_off"] if self.offense else self.P["fire_min"]
+            if self.P["surv"] and d > self.P["surv_fire_r"] and not self.aims_at_me(th, memory=8.0):
+                idle_shot = True
+            if getattr(self, "hiding", False) and d > self.P["amb_fire_r"]:
+                idle_shot = True
             if ((s >= fmin and (clear or lob)) or short) and not idle_shot:
                 return self.weapon_choice(th, weapons, kinds, eye, d, short, clear)
             return list(yaw_pitch(eye, (th.pos[0], th.pos[1], th.pos[2] + 4.5))), [False, False]
@@ -1178,7 +1267,7 @@ class Agent:
             p = lead(eye, centre, th.vel, w["stats"].get("speed", 252.0), 1.0)
             aim = list(yaw_pitch(eye, p))
             err = abs(wrap(aim[0] - me["aim"][0])) + abs(aim[1] - me["aim"][1])
-            fire[s] = err < max(0.01, math.atan2(2.2, max(d, 1.0))) and w.get("ammo", 1) > 0 \
+            fire[s] = err < max(0.01, math.atan2(self.P["aim_tol"], max(d, 1.0))) and w.get("ammo", 1) > 0 \
                 and d <= w["stats"].get("range", 230.0)
         return aim, fire
 

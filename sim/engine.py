@@ -90,6 +90,8 @@ class Mech:
         self.death_t: Optional[float] = None
         self.death_cause: Optional[str] = None
         self.kills = 0
+        self.shots: Dict[str, int] = {}
+        self.dealt: Dict[str, float] = {}
         self.last_combat = -1e9
         self.last_spend = -1e9
         self.move = [0.0, 0.0]
@@ -392,6 +394,7 @@ class Match:
         out = []
         for m in self.mechs:
             out.append({"slot": m.id, "name": m.name, "place": m.place, "kills": m.kills,
+                        "shots": dict(m.shots), "dealt": dict(m.dealt),
                         "death_t": m.death_t, "cause": m.death_cause, "cubes": m.cubes,
                         "dmg_taken": dict(m.dmg_taken), "upgrades": list(m.upg_list),
                         "act_ms_max": max(m.act_ms) if m.act_ms else 0.0,
@@ -729,6 +732,7 @@ class Match:
                     wp.reload, wp.ammo = 0.0, int(st["mag"])
                 return
             if trig and wp.cooldown <= 1e-9 and wp.equip <= 0 and wp.ammo > 0:
+                m.shots["gun"] = m.shots.get("gun", 0) + 1
                 o, d = self.muzzle(m, m.muzzle)
                 sp = math.radians(st["spread_deg"])
                 d = dir3(m.aim[0] + self.rng.gauss(0, sp), m.aim[1] + self.rng.gauss(0, sp))
@@ -939,6 +943,9 @@ class Match:
         t.hp -= amount
         t.last_combat = self.t
         t.dmg_taken[weapon] += amount
+        if by is not None and by < 100 and by != t.id:
+            att_m = self.mechs[by]
+            att_m.dealt[weapon] = att_m.dealt.get(weapon, 0.0) + amount
         ev = {"type": "damaged", "amount": round(amount, 2), "weapon": weapon,
               "bearing": bearing, "by": by}
         if rear:
