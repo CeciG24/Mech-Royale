@@ -110,11 +110,11 @@ class Agent:
 
     def __init__(self, hello: dict):
         self.P = _params()
-        self.cfg = hello["config"]
+        self.cfg = hello.get("config", {})
         self.rng = random.Random(hello.get("seed", 0))
-        mp = hello["map"]
-        self.world = World(mp["dir"], mp.get("files"))
-        self.nav = NavGrid(self.world, self.cfg["mech"])
+        mp = hello.get("map", {})
+        self.world = World(mp.get("dir") or "/arena", mp.get("files"))
+        self.nav = NavGrid(self.world, self.cfg.get("mech", {}))
         self.field: Optional[NavField] = None
         self.field_key = None
         self.pending: Optional[Tuple[tuple, NavField]] = None
@@ -133,7 +133,7 @@ class Agent:
         self.unstick_until = -1.0
         self.unstick_dir = (1.0, 0.0)
         self.mode = "idle"
-        self.mech = self.cfg["mech"]
+        self.mech = self.cfg.get("mech", {})
         self.attackers: Dict[int, float] = {}
         self.cover: Optional[NavField] = None
         self.cover_key: Optional[Tuple[float, float, float, float, float]] = None
@@ -141,6 +141,7 @@ class Agent:
     # ================================================================== main
     def act(self, obs: dict) -> dict:
         t0 = time.perf_counter()
+        self.deadline = t0 + 0.030  # keep total act() well under the 50 ms budget on slow CPUs
         self.t = float(obs["t"])
         me = obs["self"]
         self.me = me
@@ -252,7 +253,7 @@ class Agent:
                 continue
             th = self.threats.get(by) or Threat(by)
             p0 = b["path"][0]
-            th.pos = np.array([p0[0], p0[1], p0[2] - self.mech["muzzle_height"]])
+            th.pos = np.array([p0[0], p0[1], p0[2] - self.mech.get("muzzle_height", 7.0)])
             th.weapons.add(b["kind"])
             th.seen, th.est, th.conf, th.charging = t, True, 0.8, False
             self.threats[by] = th
@@ -389,7 +390,7 @@ class Agent:
     def incoming(self, obs: dict) -> List[Tuple[str, np.ndarray, np.ndarray, float]]:
         """Enemy projectiles that might reach us: (kind, pos, vel, landing time for shells)."""
         out = []
-        g = self.cfg["weapons"]["mortar"]["gravity"]
+        g = (self.cfg.get("weapons") or {}).get("mortar", {}).get("gravity", 22.0)
         for p in obs.get("projectiles", []):
             pos = np.array(p["pos"], dtype=float)
             vel = np.array(p["vel"], dtype=float)
@@ -440,7 +441,7 @@ class Agent:
             return 1.0
         if math.dist((x, y), z["next_center"]) <= self.safe_radius(z["next_radius"]):
             return 0.0
-        need = self.field_dist(x, y) / (self.mech["walk_speed"] * 0.8) + self.P["zone_margin"]
+        need = self.field_dist(x, y) / (self.mech.get("walk_speed", 11.7) * 0.8) + self.P["zone_margin"]
         left = self.time_to_edge(x, y)
         if left == math.inf:
             to_shrink = z["shrink_start"] - self.t
@@ -498,7 +499,8 @@ class Agent:
                 if weapon_danger(th.weapons, math.dist(th.pos[:2], self.pos[:2])) > 0.1:
                     cover_srcs.append(th)
             cover_srcs = cover_srcs[:2]
-        self.update_cover(cover_srcs)
+        if time.perf_counter() < self.deadline:
+            self.update_cover(cover_srcs)
 
         pts = self.candidates()
         n = len(pts)
@@ -537,12 +539,12 @@ class Agent:
             blob.weapons = {"laser", "gun"} if bl[3] not in ("lightning",) else {"lightning", "gun"}
             blob.conf = 0.25 * bl[4]
             blob.est = True
-        srcs = tops + ([blob] if blob is not None else []) + [l for l in locks if l.id < 0]
+        srcs = (tops + ([blob] if blob is not None else []) + [l for l in locks if l.id < 0])[:4]
         danger = np.zeros(n)
         Jc, Ic = self._cells(C[:, 0], C[:, 1])
-        if srcs:
+        if srcs and time.perf_counter() < self.deadline:
             gz = np.array([self.world.ground_at(px, py) for px, py in pts]) if not on_roof else np.full(n, z)
-            eh = self.mech["eye_height"]
+            eh = self.mech.get("eye_height", 8.0)
             A = np.repeat([th.pos + np.array([0.0, 0.0, eh]) for th in srcs], n, axis=0)
             B = np.stack([np.tile(C[:, 0], len(srcs)), np.tile(C[:, 1], len(srcs)),
                           np.tile(gz + 5.5, len(srcs))], axis=1)
@@ -567,7 +569,7 @@ class Agent:
 
         # incoming projectiles
         if incoming:
-            spd = self.mech["boost_speed"] if me["energy"] > 10 else self.mech["walk_speed"]
+            spd = self.mech.get("boost_speed", 19.5) if me["energy"] > 10 else self.mech.get("walk_speed", 11.7)
             ux = np.where(dist > 0.1, (C[:, 0] - x) / np.maximum(dist, 1e-6), 0.0)
             uy = np.where(dist > 0.1, (C[:, 1] - y) / np.maximum(dist, 1e-6), 0.0)
             risk = np.zeros(n)
@@ -578,7 +580,7 @@ class Agent:
                     reach_d = np.minimum(dist, spd * max(0.0, tl - 0.15))
                     fx, fy = x + ux * reach_d, y + uy * reach_d
                     dd = np.hypot(fx - ppos[0], fy - ppos[1])
-                    R = self.cfg["weapons"]["mortar"]["splash_radius"] + r + 2.0
+                    R = (self.cfg.get("weapons") or {}).get("mortar", {}).get("splash_radius", 7.0) + r + 2.0
                     risk += 3.0 * np.clip(1.0 - dd / R, 0.0, 1.0)
                 else:
                     best = np.full(n, 1e9)
@@ -707,7 +709,7 @@ class Agent:
                 return {"drop": slot}
         if None not in kinds:
             return {}
-        reach = self.cfg["loot"]["pickup_radius"] - 0.3
+        reach = (self.cfg.get("loot") or {}).get("pickup_radius", 4.0) - 0.3
         best = None
         for p in obs.get("pickups", []):
             if p["kind"] in kinds or p["kind"] in ("mortar", "gun"):
@@ -724,7 +726,7 @@ class Agent:
         me = self.me
         x, y, z = self.pos
         t = self.t
-        eye = (x, y, z + me["stats"].get("muzzle_height", self.mech["muzzle_height"]))
+        eye = (x, y, z + me["stats"].get("muzzle_height", self.mech.get("muzzle_height", 7.0)))
         fire = [False, False]
         tops = self.top_threats(1)
         primary = tops[0] if tops else None
