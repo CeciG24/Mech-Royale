@@ -1,112 +1,104 @@
-Mech Royale — mejora sobre la referencia de 3.17
+Mech Royale: seis rondas después del resultado oficial de 3.33
 
-No hay mejora validada para sustituir el 3.17. Main conserva esa estrategia. El doble disparo queda solo como experimento, sin recomendación de entrega.
-No se ha enviado nada al leaderboard ni existe puntuación oficial nueva.
-El 6.31 de otros participantes es un dato del usuario; no se identificó su código.
+Resultado y recomendación
+Ninguno de los seis cambios justifica sustituir la estrategia de 3.33.
+Se conserva la política de c0e261dde754a55c51ca5ed63a2e9339cfe2802f, que el usuario confirmó con 3.33.
+Main se actualizó a esa referencia (30e023c) y este paquete solo actualiza
+documentación y herramientas de evaluación. brain/, bot.py, Dockerfile y sim/
+mantienen el comportamiento confirmado. No hace falta entregar de nuevo el
+mismo comportamiento al leaderboard. El agente no envió ninguna entrega.
 
-Reglas y punto de partida
-Base: 59d32bc07aea7575ae48ebf7ce895a1c26560078, política de 808e115 y 3.17
-oficial reportado por el usuario. La práctica puntúa media de (16 - posición)
-contra 15 bots coordinados; bajas y daño no son puntos independientes.
-Fuente: https://www.joinbuilders.org/buildathon/tracks/builders
-No se dispone de replays oficiales del usuario ni de simulador oficial offline.
+Qué se probó: puntos locales, no puntuaciones oficiales
+Métrica: media(16 - posición). Mismos rivales, semillas y spawns, con motor
+congelado en 808e115. Igualdad de hashes de mapa inicial y simulador verificada
+por actor. Python 3.12.6, NumPy 2.2.2, PYTHONHASHSEED=0, presupuestos de reloj
+reales. No se usó el modo diagnóstico de trabajo fijo como placement.
 
-Diseño de las pruebas
-Seis variantes separadas en commits sobre la misma referencia. Entrenamiento:
-16 semillas 1201..1216 por actor, todos los slots; 112 partidas incluyendo base.
-Motor y rivales congelados en 808e115; hashes de posiciones iniciales, objetos
-y simulador iguales, verificados entre actores. Python 3.12.6, NumPy 2.2.2,
-PYTHONHASHSEED=0, dos workers por lote, reloj real (sin modo de trabajo fijo).
-Hasta ocho partidas concurrentes en un host de 12 procesadores lógicos durante
-entrenamiento. Los presupuestos internos de reloj introducen variación entre
-ejecuciones. La validación posterior usó dos lotes de dos workers como máximo.
+Ronda / hipótesis                             Media   Base   Delta SHA local
+1 Boost con recuperación y escape hasta 10     4.375  3.875  +0.500 0630377af6344e86f6446126b1d0a52912dee30b
+2 Separación ante varios atacantes             3.812  3.875  -0.062 c9a52ecb979c4b2603cc54378cc61f470cfaf14a
+3 Recuperación conservando reserva 30          3.875  4.250  -0.375 6e56f538bb18d9afbc10f2551bd1ed561291ead3
+4 Predicción de velocidad y aceleración        3.562  4.250  -0.688 dbf426573b4c6364681c5bd21474d2498486d7d3
+5 Distancia continua entre muestras            3.188  4.250  -1.062 5e216fc4a32937032e42e7ab43c7642c5ab9cd08
+6 Gradiente de presión sin saturación          3.750  4.250  -0.500 a7275cf251176fc88ce3b4a2b6201e5ea870dac1
 
-Entrenamiento: puntos locales, no oficiales
-Candidato                            Media  Delta Tarde SHA
-Referencia 3.17                      2.500 +0.000   0 59d32bc07aea7575ae48ebf7ce895a1c26560078
-Pistola simultánea conservando aim   3.188 +0.688   0 c0defa65fe070a7fc78231190cc69461c33e4a14
-Carga completa del láser             2.938 +0.438   0 a2059d1b56e4dce545f415f79686ac2abcdd6d71
-Priorizar blancos heridos            3.375 +0.875   0 f5b8f94d5fba599a82bac3b53246ed992a8018b3
-Perfil defensivo                     3.188 +0.688   0 c9630b555237069c072cc8f2e526c66f157f629a
-Corregir consultas de celdas         4.250 +1.750   0 8ebb0ed486cafd351acd320bba36b2d990ab1889
-Adelantar aim durante carga          2.500 +0.000   0 1d359abc58aeab840610b3c8a2ef80f8707936e0
-Todos los entrenamientos tuvieron cero errores y cero fallback.
-La sexta variante parte del doble disparo y prueba adelantar aim durante carga;
-no mejoró la media de la referencia. No se acumularon variantes ganadoras.
+Fase 1: 16 semillas 1601..1616 por actor, dos workers por lote y hasta ocho
+partidas simultáneas. La referencia tuvo seis ticks tardíos nativos, boost uno
+y separación dos. Todos tuvieron cero errores y cero fallback. La inestabilidad
+de carga motivó repetir la comparación reservada desde cero con un worker por
+actor y como máximo dos partidas simultáneas. No se abrió la puntuación del
+primer intento reservado bajo carga, archivado fuera de las comparaciones.
 
-Primera validación (selección cerrada antes de abrir resultados)
-Ganador de entrenamiento: cells, 4.25 contra 2.50. Corrige el redondeo vectorial
-para que coincida con NavGrid.cell; tiene prueba de coordenadas fraccionarias,
-límites y empates. La corrección matemática NO garantizó mejor placement.
-En 32 semillas nuevas 1301..1332 cayó a 2.40625 frente a
-3.09375. Delta -0.68750; IC95 pareado
-[-1.8125, 0.4375]; mejora/empata/empeora 9/9/14.
-Registró 3 ticks tardíos nativos frente a cero de la base.
-El checker Docker de cells sí pasó 300/300; eso no elimina la regresión local
-de placement ni identifica por sí solo la causa de los ticks tardíos nativos.
-Se descartó para main.
+Validación independiente de boost: semillas 1701..1732
+Referencia 4.40625; candidato 3.46875.
+Delta pareado -0.93750; IC95 bootstrap (20,000 remuestreos) [-2.125, 0.15625].
+Mejora/empata/empeora 8/5/19. Ambos tuvieron cero
+ticks tardíos, errores o fallback con esta menor carga. El candidato aumentó
+los ticks fuera de zona de 1124 a 2161 y el tiempo
+con energía <10 de 0.80% a 5.97%.
+Reducir los cambios de estado de boost no se tradujo en mejor placement.
 
-Segunda y última validación, sin reutilizar las primeras semillas
-Tras descartar cells se registró confirmation-plan.json antes de probar.
-Se eligió dualfire por ser la alternativa de combate con menos regresiones en
-entrenamiento: 4 mejoras, 11 empates, 1 regresión. No se rescataron políticas
-mirando sus resultados en 1301..1332. Se reservaron otras 32 semillas 1401..1432
-para ambos actores. Este segundo intento se registra explícitamente y exige
-IC97.5 positivo (dos intentos de validación), además de media mayor, al menos
-tantas mejoras como regresiones, y cero ticks tardíos, errores o fallback.
-No se probará otra política con estas semillas si esta no supera el criterio.
+Fase 2: nuevas hipótesis y control repetido
+Rondas 3..6 se compararon con la referencia repetida bajo menor carga: 16 semillas
+1601..1616, un worker por actor, hasta cinco partidas simultáneas mientras se
+incorporaban los candidatos. La referencia pasó de 3.875 bajo la otra carga a
+4.25 sin cambiar código. Los relojes internos pueden cambiar decisiones incluso
+si el bot no excede 50 ms. Por eso no se mezclan los controles de ambas fases.
+Todos los actores de esta fase tuvieron cero tardíos, errores y fallback.
+Ninguno superó 4.25. No se abrió una validación para rescatar candidatos perdedores.
+Las semillas 1801..1832 siguen reservadas para un siguiente experimento.
+Hay 192 partidas con resultados guardados usadas en estas comparaciones,
+además del intento bajo carga archivado y las repeticiones por el exportador.
 
-Base: 2.15625; dualfire: 2.68750.
-Delta pareado: +0.53125; IC97.5 bootstrap, 20,000 remuestreos:
-[-0.46875, 1.875].
-Mejora/empata/empeora: 9/18/5.
-Ticks tardíos: 0; errores: 0;
-fallback: 0. Criterio superado: False.
-Total de esta revisión: 240 partidas comparativas y una traza diagnóstica adicional
-(semilla 1501), sin contar checker y unit tests.
-El intervalo solo describe este simulador aproximado, no las 48 semillas oficiales.
+Cambios aislados y límites de lo que demuestran
+1. Histeresis: recargar a 60% antes del siguiente sprint, con excepción que permite
+   gastar hasta 10 en emergencias. Ganó entrenamiento y perdió validación.
+2. Separación: mantener distancia de pistola al coincidir varios atacantes y dejar
+   de incentivar loot durante ese estado. No ganó; no se combinó con otros cambios.
+3. Ablación de la excepción: conservar reserva 30 en emergencias. Tampoco ganó.
+4. Inercia: proyectar el movimiento horizontal con velocidad actual, aceleración,
+   stats vivos, suelo/aire y lentitud al cargar láser para esquivar balas.
+5. Cruce continuo: detectar balas que cruzan entre muestras de la trayectoria.
+6. Fuego cruzado: mantener diferencias relativas entre movimientos legales cuando
+   la suma de presiones excede el recorte, sin alterar riesgo absoluto del loot.
+Las pruebas unitarias validan propiedades concretas de estas funciones, pero
+no demuestran mejor placement. El simulador sigue aproximando al servidor.
 
-Qué hace dualfire
-El plan original elige disparar pistola O láser/rayos aunque los gatillos sean
-independientes. Se añade support_gun: si la pistola ya está alineada con el
-adelanto del blanco visible, tiene munición y alcance, se permite el disparo
-simultáneo. Se conserva el aim, carga y liberación del arma principal. Una
-decisión de no atacar sigue sin atacar. Se mantienen distancia, pesos de
-movimiento, upgrades y recogida de armas de la referencia de 3.17.
-Pruebas: carga/liberación del láser, blancos móviles, obstáculo, fuera de alcance,
-silencio, munición, recarga y cooldown, más las tres pruebas de arranque/fallback.
+Incidencia del exportador
+Un contador diagnóstico NumPy int64 no se pudo guardar como JSON después de
+completar ciertas partidas. Se corrigió la conversión al exportar sin cambiar
+el bot. Solo se repitieron las partidas sin archivo; las completas se conservaron
+tras comprobar actor, semilla y escenario. Logs originales en evidence/export-failure.
+El harness público hace ejecuciones nuevas: no reutiliza automáticamente esos caches.
 
-Checker oficial de dualfire en Docker
-PASS: 300/300 a tiempo, cero tardíos, wrong tick, líneas inválidas o respuestas
-antiguas descartadas. p99 ida y vuelta 16.2 ms, máximo 18.1 ms en este host.
-Siete pruebas pasaron dentro de Docker. Perfil linux/amd64, 1 CPU, 512 MB sin
-swap, 128 procesos, sin red, solo lectura, UID 65534, /tmp de 64 MB.
-El checker valida protocolo y latencia; no demuestra mejora de placement.
+Checker oficial Docker del paquete final conservado
+PASS: 300/300 a tiempo, cero ticks tardíos. p99 ida y vuelta 3.8 ms,
+máximo 12.7 ms. Siete tests de arranque/fallback/disparo pasaron.
+Perfil: linux/amd64, 1 CPU, 512 MB sin swap, 128 procesos, sin red, solo lectura,
+UID 65534:65534, /tmp 64 MB. El candidato boost también pasó checker (p99 15.2 ms),
+pero perdió placement: pasar checker no fue motivo para conservarlo.
+El p99 de Agent.act nativo y el p99 de ida y vuelta no son la misma medición.
 
-Reproducir el candidato desde su checkout
+Reproducir el mejor conservado
 python tools/retest.py --docker --check-only
 git worktree add --detach ../mech-reference-808 808e115286c5dfdde8dcca00dddc74e8af92e22f
-python tools/batch.py --bot-root . --engine-root ../mech-reference-808 --squad --seeds 1401,1402,1403,1404,1405,1406,1407,1408,1409,1410,1411,1412,1413,1414,1415,1416,1417,1418,1419,1420,1421,1422,1423,1424,1425,1426,1427,1428,1429,1430,1431,1432 --jobs 2 --out validation-retest.json
-Para repetir la base usar un checkout de 59d32bc como --bot-root, manteniendo
-el mismo --engine-root. Los comandos no envían al leaderboard.
+python tools/batch.py --bot-root . --engine-root ../mech-reference-808 --squad --seeds 1601,1602,1603,1604,1605,1606,1607,1608,1609,1610,1611,1612,1613,1614,1615,1616 --jobs 1 --out evaluation-retest.json
+Para comparar candidatos, restaurar su SHA desde candidates.bundle y mantener
+el mismo --engine-root. Su SHA, diff y decisión están en rounds.csv y patches/.
+Los comandos no envían al leaderboard. La política recomendada no tiene diff
+respecto a la referencia confirmada; el diff publicado afecta solo informes/harness.
 
-Conclusión técnica y límites
-No se verificó alcanzar 6.31 ni mejorar 3.17 en la página. El simulador aproxima
-física y decisiones del escuadrón; pasar checker o ganar entrenamiento no basta.
-El fracaso de cells muestra que reducir exposición a zona no evita morir por
-pistola. La traza adicional 1501 no se usó para elegir candidato: la referencia
-acumula 13 cubos, pero sigue en una zona pequeña mientras aparecen 6-8 mechs.
-Entre t=130 y t=150 pasa de 2155 a 85 HP, dentro de zona, y muere por pistola.
-La energía oscila alrededor de 29-33 y boost se enciende y apaga. En esa partida
-hubo 152 ticks con energía menor de 10 entre 1515 ticks con mechs observados.
-Es evidencia local de una retirada insuficiente; no un replay oficial ni prueba
-causal de la política de energía. Datos: diagnostic-1501.json.
-La siguiente hipótesis útil es una retirada táctica ante varios atacantes,
-con recarga de energía por histéresis (no reactivar boost en cuanto cruza 30),
-manteniendo excepciones para salir de zona o esquivar un disparo inminente.
-Debe probarse como un cambio de estado aislado, con un nuevo lote y sin apilar
-los seis cambios. No seguir ajustando pesos para ganar estas mismas semillas.
+Qué falta y próxima hipótesis
+No se conocen el motor oficial offline ni las 48 semillas privadas, ni hay replays
+oficiales del usuario. No se verificó superar 3.33 ni alcanzar 6.31. Reglas:
+https://www.joinbuilders.org/buildathon/tracks/builders
+La variación de la misma base con la carga limita la fiabilidad del ranking local.
+Conviene comparar placement con el actor dentro de Docker a 1 CPU y separar
+la variación del planificador por presupuesto de reloj de cambios estratégicos.
 
-Actualización posterior: el usuario confirmó 3.33 oficial para la propuesta c0e261d.
-Se adopta esa política como nueva referencia y se promueve a main. Los resultados
-locales y su incertidumbre anteriores se conservan como historial, sin reinterpretarlos.
+La siguiente hipótesis de estrategia más concreta es suspender el compromiso de
+rumbo solo ante un impacto inminente: w_commit=20 puede superar por sí solo el
+coste máximo f_aoe ponderado de 10..14. Es una interacción de pesos identificada
+en el código, no una causa de muerte demostrada por este lote. Debe probarse con
+una condición aislada, manteniendo el modelo y los demás pesos de la versión 3.33,
+en nuevas semillas. No acumular las correcciones matemáticas descartadas.

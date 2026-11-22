@@ -51,6 +51,8 @@ def main():
             self.first_weapon_t = None
             self.weapon_ticks = 0
             self.grab_ticks = self.blocked_grab_ticks = self.take_commands = 0
+            self.energy_sum = self.low_energy_ticks = self.boost_ticks = self.boost_switches = self.retreat_ticks = 0
+            self.previous_boost = False
 
         def act(self, obs):
             t0 = time.perf_counter()
@@ -58,6 +60,13 @@ def main():
             self.latencies.append((time.perf_counter() - t0) * 1000)
             self.decisions += 1
             self.outside += not obs['self']['in_zone']
+            self.energy_sum += obs['self']['energy']
+            self.low_energy_ticks += obs['self']['energy'] < 10
+            boosted = bool(a.get('boost'))
+            self.boost_ticks += boosted
+            self.boost_switches += boosted != self.previous_boost
+            self.previous_boost = boosted
+            self.retreat_ticks += bool(getattr(self.agent, 'retreating', False))
             armed = any(w and w['kind'] != 'gun' for w in obs['self']['weapons'])
             self.weapon_ticks += armed
             if armed and self.first_weapon_t is None:
@@ -99,7 +108,9 @@ def main():
                       first_weapon_t=b.first_weapon_t,weapon_ticks=b.weapon_ticks,
                       grab_ticks=b.grab_ticks,blocked_grab_ticks=b.blocked_grab_ticks,
                       take_commands=b.take_commands,
-                      wall_s=time.perf_counter()-t0)
+                      wall_s=time.perf_counter()-t0,
+                      energy_mean=float(b.energy_sum/max(1,b.decisions)), low_energy_ticks=int(b.low_energy_ticks),
+                      boost_ticks=int(b.boost_ticks), boost_switches=int(b.boost_switches),retreat_ticks=int(b.retreat_ticks))
         rows.append(result)
         print(json.dumps({'seed':seed, 'points':result['points'], 'kills':result['kills'],
                           'fallback':b.act_errors, 'late':result['late']}), flush=True)

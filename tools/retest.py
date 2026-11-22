@@ -17,8 +17,8 @@ def main():
     ap.add_argument('--docker',action='store_true')
     ap.add_argument('--image',default='mech-royale-review:best')
     ap.add_argument('--check-only',action='store_true')
-    ap.add_argument('--seeds',default=','.join(map(str,range(1001,1025))))
-    ap.add_argument('--jobs',type=int,default=2)
+    ap.add_argument('--seeds',default=','.join(map(str,range(1601,1617))))
+    ap.add_argument('--jobs',type=int,default=1)
     ap.add_argument('--out',default=str(ROOT/'evaluation-retest.json'))
     a = ap.parse_args()
     if a.docker:

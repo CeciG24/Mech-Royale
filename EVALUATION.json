@@ -1,403 +1,440 @@
 {
-  "official_baseline_sha": "59d32bc07aea7575ae48ebf7ce895a1c26560078",
-  "official_baseline_score": 3.17,
-  "official_baseline_score_source": "User reported",
-  "candidate_official_score": null,
-  "leaderboard_submitted": false,
-  "training": {
+  "recommended_policy_sha": "c0e261dde754a55c51ca5ed63a2e9339cfe2802f",
+  "official_score": 3.33,
+  "official_score_source": "User reported for the previous published proposal",
+  "policy_changed": false,
+  "decision": "Retain confirmed 3.33 policy. All six new candidates rejected.",
+  "rounds": [
+    {
+      "round": "1",
+      "candidate": "Boost con recuperación y escape hasta 10",
+      "sha": "0630377af6344e86f6446126b1d0a52912dee30b",
+      "local_points": 4.375,
+      "reference_points": 3.875,
+      "delta_vs_reference": 0.5,
+      "late": 1,
+      "reference_late": 6,
+      "decision": "Descartado: perdió validación",
+      "evidence_phase": "phase1"
+    },
+    {
+      "round": "2",
+      "candidate": "Separación ante varios atacantes",
+      "sha": "c9a52ecb979c4b2603cc54378cc61f470cfaf14a",
+      "local_points": 3.8125,
+      "reference_points": 3.875,
+      "delta_vs_reference": -0.0625,
+      "late": 2,
+      "reference_late": 6,
+      "decision": "Descartado: no supera entrenamiento",
+      "evidence_phase": "phase1"
+    },
+    {
+      "round": "3",
+      "candidate": "Recuperación conservando reserva 30",
+      "sha": "6e56f538bb18d9afbc10f2551bd1ed561291ead3",
+      "local_points": 3.875,
+      "reference_points": 4.25,
+      "delta_vs_reference": -0.375,
+      "late": 0,
+      "reference_late": 0,
+      "decision": "Descartado: no supera entrenamiento",
+      "evidence_phase": "stage2"
+    },
+    {
+      "round": "4",
+      "candidate": "Predicción de velocidad y aceleración",
+      "sha": "dbf426573b4c6364681c5bd21474d2498486d7d3",
+      "local_points": 3.5625,
+      "reference_points": 4.25,
+      "delta_vs_reference": -0.6875,
+      "late": 0,
+      "reference_late": 0,
+      "decision": "Descartado: no supera entrenamiento",
+      "evidence_phase": "stage2"
+    },
+    {
+      "round": "5",
+      "candidate": "Distancia continua entre muestras",
+      "sha": "5e216fc4a32937032e42e7ab43c7642c5ab9cd08",
+      "local_points": 3.1875,
+      "reference_points": 4.25,
+      "delta_vs_reference": -1.0625,
+      "late": 0,
+      "reference_late": 0,
+      "decision": "Descartado: no supera entrenamiento",
+      "evidence_phase": "stage2"
+    },
+    {
+      "round": "6",
+      "candidate": "Gradiente de presión sin saturación",
+      "sha": "a7275cf251176fc88ce3b4a2b6201e5ea870dac1",
+      "local_points": 3.75,
+      "reference_points": 4.25,
+      "delta_vs_reference": -0.5,
+      "late": 0,
+      "reference_late": 0,
+      "decision": "Descartado: no supera entrenamiento",
+      "evidence_phase": "stage2"
+    }
+  ],
+  "phase1_training": {
     "base": {
-      "sha": "59d32bc07aea7575ae48ebf7ce895a1c26560078",
-      "seeds": "1201,1202,1203,1204,1205,1206,1207,1208,1209,1210,1211,1212,1213,1214,1215,1216",
+      "sha": "c0e261dde754a55c51ca5ed63a2e9339cfe2802f",
+      "seeds": "1601,1602,1603,1604,1605,1606,1607,1608,1609,1610,1611,1612,1613,1614,1615,1616",
       "opp": "house",
       "squad": true,
-      "mean_points": 2.5,
-      "late": 0,
+      "mean_points": 3.875,
+      "late": 6,
       "errors": 0,
       "fallback_ticks": 0,
       "fallback_init": 0,
-      "outside_ticks": 846,
-      "stalled_ticks": 129,
-      "max_act_p99_ms": 12.962460005655878
+      "outside_ticks": 249,
+      "stalled_ticks": 136,
+      "max_act_p99_ms": 20.779760056175295
+    },
+    "base_telemetry": {
+      "summary": {
+        "sha": "c0e261dde754a55c51ca5ed63a2e9339cfe2802f",
+        "seeds": "1601,1602,1603,1604,1605,1606,1607,1608,1609,1610,1611,1612,1613,1614,1615,1616",
+        "opp": "house",
+        "squad": true,
+        "mean_points": 3.875,
+        "late": 6,
+        "errors": 0,
+        "fallback_ticks": 0,
+        "fallback_init": 0,
+        "outside_ticks": 249,
+        "stalled_ticks": 136,
+        "max_act_p99_ms": 20.779760056175295
+      },
+      "delta": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "wins": 0,
+      "ties": 16,
+      "losses": 0,
+      "energy_mean": 69.41759835889896,
+      "low_energy_fraction": 0.005541777655307553,
+      "boost_switches_per_minute": 60.32883255258565,
+      "retreat_fraction": 0.0
     },
     "training": {
-      "dualfire": {
-        "delta": 0.6875,
-        "ci95_bootstrap": [
-          -0.0625,
-          1.8125
-        ],
-        "wins": 4,
-        "ties": 11,
-        "losses": 1,
-        "mean_points": 3.1875,
+      "boost": {
         "summary": {
-          "sha": "c0defa65fe070a7fc78231190cc69461c33e4a14",
-          "seeds": "1201,1202,1203,1204,1205,1206,1207,1208,1209,1210,1211,1212,1213,1214,1215,1216",
+          "sha": "0630377af6344e86f6446126b1d0a52912dee30b",
+          "seeds": "1601,1602,1603,1604,1605,1606,1607,1608,1609,1610,1611,1612,1613,1614,1615,1616",
           "opp": "house",
           "squad": true,
-          "mean_points": 3.1875,
-          "late": 0,
+          "mean_points": 4.375,
+          "late": 1,
           "errors": 0,
           "fallback_ticks": 0,
           "fallback_init": 0,
-          "outside_ticks": 836,
-          "stalled_ticks": 165,
-          "max_act_p99_ms": 12.730974946171042
+          "outside_ticks": 893,
+          "stalled_ticks": 164,
+          "max_act_p99_ms": 15.993810086511075
         },
-        "mean_kills": 1.75,
-        "mean_gun_shots": 89.9375,
-        "deaths": {
-          "laser": 1,
-          "zone": 2,
-          "mortar": 3,
-          "gun": 9,
-          "lightning": 1
-        }
-      },
-      "fullcharge": {
-        "delta": 0.4375,
-        "ci95_bootstrap": [
-          -0.1875,
-          1.125
-        ],
-        "wins": 5,
-        "ties": 9,
-        "losses": 2,
-        "mean_points": 2.9375,
-        "summary": {
-          "sha": "a2059d1b56e4dce545f415f79686ac2abcdd6d71",
-          "seeds": "1201,1202,1203,1204,1205,1206,1207,1208,1209,1210,1211,1212,1213,1214,1215,1216",
-          "opp": "house",
-          "squad": true,
-          "mean_points": 2.9375,
-          "late": 0,
-          "errors": 0,
-          "fallback_ticks": 0,
-          "fallback_init": 0,
-          "outside_ticks": 867,
-          "stalled_ticks": 144,
-          "max_act_p99_ms": 13.306592982262373
-        },
-        "mean_kills": 1.1875,
-        "mean_gun_shots": 78.25,
-        "deaths": {
-          "gun": 10,
-          "zone": 2,
-          "mortar": 3,
-          "lightning": 1
-        }
-      },
-      "finish": {
-        "delta": 0.875,
-        "ci95_bootstrap": [
-          -0.375,
-          2.0625
-        ],
-        "wins": 9,
-        "ties": 5,
-        "losses": 2,
-        "mean_points": 3.375,
-        "summary": {
-          "sha": "f5b8f94d5fba599a82bac3b53246ed992a8018b3",
-          "seeds": "1201,1202,1203,1204,1205,1206,1207,1208,1209,1210,1211,1212,1213,1214,1215,1216",
-          "opp": "house",
-          "squad": true,
-          "mean_points": 3.375,
-          "late": 0,
-          "errors": 0,
-          "fallback_ticks": 0,
-          "fallback_init": 0,
-          "outside_ticks": 556,
-          "stalled_ticks": 153,
-          "max_act_p99_ms": 12.156157880090175
-        },
-        "mean_kills": 1.5,
-        "mean_gun_shots": 83.875,
-        "deaths": {
-          "gun": 8,
-          "mortar": 3,
-          "lightning": 3,
-          "zone": 1,
-          "laser": 1
-        }
-      },
-      "defense": {
-        "delta": 0.6875,
-        "ci95_bootstrap": [
-          -1.125,
-          2.125
-        ],
-        "wins": 8,
-        "ties": 5,
-        "losses": 3,
-        "mean_points": 3.1875,
-        "summary": {
-          "sha": "c9630b555237069c072cc8f2e526c66f157f629a",
-          "seeds": "1201,1202,1203,1204,1205,1206,1207,1208,1209,1210,1211,1212,1213,1214,1215,1216",
-          "opp": "house",
-          "squad": true,
-          "mean_points": 3.1875,
-          "late": 0,
-          "errors": 0,
-          "fallback_ticks": 0,
-          "fallback_init": 0,
-          "outside_ticks": 471,
-          "stalled_ticks": 102,
-          "max_act_p99_ms": 11.849647928029295
-        },
-        "mean_kills": 1.375,
-        "mean_gun_shots": 82.3125,
-        "deaths": {
-          "gun": 6,
-          "mortar": 3,
-          "lightning": 3,
-          "laser": 3,
-          "zone": 1
-        }
-      },
-      "cells": {
-        "delta": 1.75,
-        "ci95_bootstrap": [
-          -0.1875,
-          3.75
-        ],
-        "wins": 10,
-        "ties": 3,
-        "losses": 3,
-        "mean_points": 4.25,
-        "summary": {
-          "sha": "8ebb0ed486cafd351acd320bba36b2d990ab1889",
-          "seeds": "1201,1202,1203,1204,1205,1206,1207,1208,1209,1210,1211,1212,1213,1214,1215,1216",
-          "opp": "house",
-          "squad": true,
-          "mean_points": 4.25,
-          "late": 0,
-          "errors": 0,
-          "fallback_ticks": 0,
-          "fallback_init": 0,
-          "outside_ticks": 563,
-          "stalled_ticks": 165,
-          "max_act_p99_ms": 11.42239806242287
-        },
-        "mean_kills": 1.6875,
-        "mean_gun_shots": 90.0625,
-        "deaths": {
-          "gun": 8,
-          "mortar": 4,
-          "lightning": 1,
-          "zone": 1,
-          "laser": 2
-        }
-      },
-      "coaim": {
-        "delta": 0.0,
-        "ci95_bootstrap": [
-          -1.3125,
-          1.125
+        "delta": 0.5,
+        "ci95": [
+          -0.4375,
+          1.5
         ],
         "wins": 6,
-        "ties": 7,
-        "losses": 3,
-        "mean_points": 2.5,
+        "ties": 4,
+        "losses": 6,
+        "energy_mean": 71.29827703895495,
+        "low_energy_fraction": 0.07579145580793221,
+        "boost_switches_per_minute": 35.60668471225138,
+        "retreat_fraction": 0.0
+      },
+      "retreat": {
         "summary": {
-          "sha": "1d359abc58aeab840610b3c8a2ef80f8707936e0",
-          "seeds": "1201,1202,1203,1204,1205,1206,1207,1208,1209,1210,1211,1212,1213,1214,1215,1216",
+          "sha": "c9a52ecb979c4b2603cc54378cc61f470cfaf14a",
+          "seeds": "1601,1602,1603,1604,1605,1606,1607,1608,1609,1610,1611,1612,1613,1614,1615,1616",
           "opp": "house",
           "squad": true,
-          "mean_points": 2.5,
+          "mean_points": 3.8125,
+          "late": 2,
+          "errors": 0,
+          "fallback_ticks": 0,
+          "fallback_init": 0,
+          "outside_ticks": 240,
+          "stalled_ticks": 106,
+          "max_act_p99_ms": 14.040434982161969
+        },
+        "delta": -0.0625,
+        "ci95": [
+          -0.6875,
+          0.6875
+        ],
+        "wins": 4,
+        "ties": 6,
+        "losses": 6,
+        "energy_mean": 72.69847899915824,
+        "low_energy_fraction": 0.0034832080345998666,
+        "boost_switches_per_minute": 58.06507793677978,
+        "retreat_fraction": 0.07433746480508549
+      }
+    },
+    "both_isolated_win": false,
+    "selected": "boost",
+    "selection_closed": true
+  },
+  "phase1_validation": {
+    "summary": {
+      "sha": "0630377af6344e86f6446126b1d0a52912dee30b",
+      "seeds": "1701,1702,1703,1704,1705,1706,1707,1708,1709,1710,1711,1712,1713,1714,1715,1716,1717,1718,1719,1720,1721,1722,1723,1724,1725,1726,1727,1728,1729,1730,1731,1732",
+      "opp": "house",
+      "squad": true,
+      "mean_points": 3.46875,
+      "late": 0,
+      "errors": 0,
+      "fallback_ticks": 0,
+      "fallback_init": 0,
+      "outside_ticks": 2161,
+      "stalled_ticks": 421,
+      "max_act_p99_ms": 12.65919293044135
+    },
+    "delta": -0.9375,
+    "ci95": [
+      -2.125,
+      0.15625
+    ],
+    "wins": 8,
+    "ties": 5,
+    "losses": 19,
+    "energy_mean": 76.44334858928923,
+    "low_energy_fraction": 0.05972148578126308,
+    "boost_switches_per_minute": 30.02260486144057,
+    "retreat_fraction": 0.0,
+    "base": {
+      "sha": "c0e261dde754a55c51ca5ed63a2e9339cfe2802f",
+      "seeds": "1701,1702,1703,1704,1705,1706,1707,1708,1709,1710,1711,1712,1713,1714,1715,1716,1717,1718,1719,1720,1721,1722,1723,1724,1725,1726,1727,1728,1729,1730,1731,1732",
+      "opp": "house",
+      "squad": true,
+      "mean_points": 4.40625,
+      "late": 0,
+      "errors": 0,
+      "fallback_ticks": 0,
+      "fallback_init": 0,
+      "outside_ticks": 1124,
+      "stalled_ticks": 617,
+      "max_act_p99_ms": 11.676964098587627
+    },
+    "base_telemetry": {
+      "summary": {
+        "sha": "c0e261dde754a55c51ca5ed63a2e9339cfe2802f",
+        "seeds": "1701,1702,1703,1704,1705,1706,1707,1708,1709,1710,1711,1712,1713,1714,1715,1716,1717,1718,1719,1720,1721,1722,1723,1724,1725,1726,1727,1728,1729,1730,1731,1732",
+        "opp": "house",
+        "squad": true,
+        "mean_points": 4.40625,
+        "late": 0,
+        "errors": 0,
+        "fallback_ticks": 0,
+        "fallback_init": 0,
+        "outside_ticks": 1124,
+        "stalled_ticks": 617,
+        "max_act_p99_ms": 11.676964098587627
+      },
+      "delta": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "wins": 0,
+      "ties": 32,
+      "losses": 0,
+      "energy_mean": 74.15663935330359,
+      "low_energy_fraction": 0.007957643276973259,
+      "boost_switches_per_minute": 51.310253541545194,
+      "retreat_fraction": 0.0
+    },
+    "selected": "boost",
+    "promote_to_main": false,
+    "experimental_signal": false
+  },
+  "stage2_training": {
+    "base": {
+      "sha": "c0e261dde754a55c51ca5ed63a2e9339cfe2802f",
+      "seeds": "1601,1602,1603,1604,1605,1606,1607,1608,1609,1610,1611,1612,1613,1614,1615,1616",
+      "opp": "house",
+      "squad": true,
+      "mean_points": 4.25,
+      "late": 0,
+      "errors": 0,
+      "fallback_ticks": 0,
+      "fallback_init": 0,
+      "outside_ticks": 655,
+      "stalled_ticks": 119,
+      "max_act_p99_ms": 7.306694062426681
+    },
+    "training": {
+      "reserve": {
+        "summary": {
+          "sha": "6e56f538bb18d9afbc10f2551bd1ed561291ead3",
+          "seeds": "1601,1602,1603,1604,1605,1606,1607,1608,1609,1610,1611,1612,1613,1614,1615,1616",
+          "opp": "house",
+          "squad": true,
+          "mean_points": 3.875,
           "late": 0,
           "errors": 0,
           "fallback_ticks": 0,
           "fallback_init": 0,
-          "outside_ticks": 840,
-          "stalled_ticks": 142,
-          "max_act_p99_ms": 11.927255899645388
+          "outside_ticks": 638,
+          "stalled_ticks": 144,
+          "max_act_p99_ms": 6.979545988142489
         },
-        "mean_kills": 1.1875,
-        "mean_gun_shots": 84.3125,
-        "deaths": {
-          "gun": 7,
-          "zone": 2,
-          "mortar": 4,
-          "lightning": 2,
-          "laser": 1
-        }
+        "delta": -0.375,
+        "ci95": [
+          -1.3125,
+          0.875
+        ],
+        "ci975": [
+          -1.4375,
+          1.125
+        ],
+        "wins": 2,
+        "ties": 4,
+        "losses": 10,
+        "energy_mean": 75.30867479098771,
+        "low_energy_fraction": 0.012271503471730196,
+        "boost_switches_per_minute": 34.51891738699164
+      },
+      "inertia": {
+        "summary": {
+          "sha": "dbf426573b4c6364681c5bd21474d2498486d7d3",
+          "seeds": "1601,1602,1603,1604,1605,1606,1607,1608,1609,1610,1611,1612,1613,1614,1615,1616",
+          "opp": "house",
+          "squad": true,
+          "mean_points": 3.5625,
+          "late": 0,
+          "errors": 0,
+          "fallback_ticks": 0,
+          "fallback_init": 0,
+          "outside_ticks": 479,
+          "stalled_ticks": 113,
+          "max_act_p99_ms": 6.6472201701253635
+        },
+        "delta": -0.6875,
+        "ci95": [
+          -1.8125,
+          0.5625
+        ],
+        "ci975": [
+          -1.9375,
+          0.75
+        ],
+        "wins": 3,
+        "ties": 5,
+        "losses": 8,
+        "energy_mean": 75.46391836618761,
+        "low_energy_fraction": 0.0065045730841333865,
+        "boost_switches_per_minute": 47.00335170141453
+      },
+      "swept": {
+        "summary": {
+          "sha": "5e216fc4a32937032e42e7ab43c7642c5ab9cd08",
+          "seeds": "1601,1602,1603,1604,1605,1606,1607,1608,1609,1610,1611,1612,1613,1614,1615,1616",
+          "opp": "house",
+          "squad": true,
+          "mean_points": 3.1875,
+          "late": 0,
+          "errors": 0,
+          "fallback_ticks": 0,
+          "fallback_init": 0,
+          "outside_ticks": 269,
+          "stalled_ticks": 136,
+          "max_act_p99_ms": 8.644479932263492
+        },
+        "delta": -1.0625,
+        "ci95": [
+          -2.4375,
+          0.1875
+        ],
+        "ci975": [
+          -2.625,
+          0.375
+        ],
+        "wins": 5,
+        "ties": 3,
+        "losses": 8,
+        "energy_mean": 72.011234861846,
+        "low_energy_fraction": 0.0069664902998236335,
+        "boost_switches_per_minute": 50.864197530864196
+      },
+      "gradient": {
+        "summary": {
+          "sha": "a7275cf251176fc88ce3b4a2b6201e5ea870dac1",
+          "seeds": "1601,1602,1603,1604,1605,1606,1607,1608,1609,1610,1611,1612,1613,1614,1615,1616",
+          "opp": "house",
+          "squad": true,
+          "mean_points": 3.75,
+          "late": 0,
+          "errors": 0,
+          "fallback_ticks": 0,
+          "fallback_init": 0,
+          "outside_ticks": 550,
+          "stalled_ticks": 127,
+          "max_act_p99_ms": 6.299779955297686
+        },
+        "delta": -0.5,
+        "ci95": [
+          -1.6875,
+          0.4375
+        ],
+        "ci975": [
+          -1.875,
+          0.5625
+        ],
+        "wins": 5,
+        "ties": 6,
+        "losses": 5,
+        "energy_mean": 73.39405751227235,
+        "low_energy_fraction": 0.004801630945036079,
+        "boost_switches_per_minute": 53.402720030043724
       }
     },
-    "selected_by_training": "cells",
-    "eligible_for_validation": true,
-    "validation_rule": "One selected candidate only; positive held-out delta with paired bootstrap CI95 lower bound > 0, wins >= losses, no protocol/stability regression. Report confidence interval even if inconclusive. Keep main when held-out result does not improve.",
-    "caveats": "Local approximate simulator; real-clock variation; concurrent batches up to eight match processes on this 12-logical-CPU host. Each batch uses two workers. Private official seeds not available."
+    "selected": "base",
+    "selection_closed": true
   },
-  "first_validation": {
-    "delta": -0.6875,
-    "ci95_bootstrap": [
-      -1.8125,
-      0.4375
-    ],
-    "wins": 9,
-    "ties": 9,
-    "losses": 14,
-    "mean_points": 2.40625,
-    "summary": {
-      "sha": "8ebb0ed486cafd351acd320bba36b2d990ab1889",
-      "seeds": "1301,1302,1303,1304,1305,1306,1307,1308,1309,1310,1311,1312,1313,1314,1315,1316,1317,1318,1319,1320,1321,1322,1323,1324,1325,1326,1327,1328,1329,1330,1331,1332",
-      "opp": "house",
-      "squad": true,
-      "mean_points": 2.40625,
-      "late": 3,
-      "errors": 0,
-      "fallback_ticks": 0,
-      "fallback_init": 0,
-      "outside_ticks": 57,
-      "stalled_ticks": 287,
-      "max_act_p99_ms": 34.06951192300767
-    },
-    "mean_kills": 1.46875,
-    "mean_gun_shots": 98.65625,
-    "deaths": {
-      "laser": 3,
-      "gun": 25,
-      "mortar": 2,
-      "lightning": 2
-    },
-    "base": {
-      "sha": "59d32bc07aea7575ae48ebf7ce895a1c26560078",
-      "seeds": "1301,1302,1303,1304,1305,1306,1307,1308,1309,1310,1311,1312,1313,1314,1315,1316,1317,1318,1319,1320,1321,1322,1323,1324,1325,1326,1327,1328,1329,1330,1331,1332",
-      "opp": "house",
-      "squad": true,
-      "mean_points": 3.09375,
-      "late": 0,
-      "errors": 0,
-      "fallback_ticks": 0,
-      "fallback_init": 0,
-      "outside_ticks": 445,
-      "stalled_ticks": 312,
-      "max_act_p99_ms": 12.234604042023422
-    },
-    "selected": "cells",
-    "passes_rule": false
-  },
-  "second_validation_plan": {
-    "candidate": "dualfire",
-    "sha": "c0defa65fe070a7fc78231190cc69461c33e4a14",
-    "seeds": [
-      1401,
-      1402,
-      1403,
-      1404,
-      1405,
-      1406,
-      1407,
-      1408,
-      1409,
-      1410,
-      1411,
-      1412,
-      1413,
-      1414,
-      1415,
-      1416,
-      1417,
-      1418,
-      1419,
-      1420,
-      1421,
-      1422,
-      1423,
-      1424,
-      1425,
-      1426,
-      1427,
-      1428,
-      1429,
-      1430,
-      1431,
-      1432
-    ],
-    "selection_reason": "Least training regressions among positive combat variants: 4 wins, 11 ties, 1 loss. Cell candidate rejected, not combined.",
-    "criterion": "Positive held-out delta, paired bootstrap CI97.5 lower > 0 (two validation attempts), wins >= losses, zero late/errors/fallback. No further selection or new candidates if inconclusive.",
-    "reuse_of_first_validation_seeds": false
-  },
-  "second_validation": {
-    "delta": 0.53125,
-    "ci95_bootstrap": [
-      -0.34375,
-      1.65625
-    ],
-    "wins": 9,
-    "ties": 18,
-    "losses": 5,
-    "mean_points": 2.6875,
-    "summary": {
-      "sha": "c0defa65fe070a7fc78231190cc69461c33e4a14",
-      "seeds": "1401,1402,1403,1404,1405,1406,1407,1408,1409,1410,1411,1412,1413,1414,1415,1416,1417,1418,1419,1420,1421,1422,1423,1424,1425,1426,1427,1428,1429,1430,1431,1432",
-      "opp": "house",
-      "squad": true,
-      "mean_points": 2.6875,
-      "late": 0,
-      "errors": 0,
-      "fallback_ticks": 0,
-      "fallback_init": 0,
-      "outside_ticks": 986,
-      "stalled_ticks": 334,
-      "max_act_p99_ms": 14.798219944350443
-    },
-    "mean_kills": 1.71875,
-    "mean_gun_shots": 87.9375,
-    "deaths": {
-      "zone": 4,
-      "gun": 19,
-      "lightning": 2,
-      "laser": 5,
-      "mortar": 1,
-      "survived": 1
-    },
-    "base": {
-      "sha": "59d32bc07aea7575ae48ebf7ce895a1c26560078",
-      "seeds": "1401,1402,1403,1404,1405,1406,1407,1408,1409,1410,1411,1412,1413,1414,1415,1416,1417,1418,1419,1420,1421,1422,1423,1424,1425,1426,1427,1428,1429,1430,1431,1432",
-      "opp": "house",
-      "squad": true,
-      "mean_points": 2.15625,
-      "late": 0,
-      "errors": 0,
-      "fallback_ticks": 0,
-      "fallback_init": 0,
-      "outside_ticks": 1108,
-      "stalled_ticks": 319,
-      "max_act_p99_ms": 13.67440194822848
-    },
-    "selected": "dualfire",
-    "passes_rule": false,
-    "ci975_bootstrap": [
-      -0.46875,
-      1.875
-    ]
-  },
+  "reserved_1801_1832_used": false,
   "checker": {
     "result": "PASS",
     "observations": 300,
     "on_time": 300,
     "late": 0,
-    "p99_roundtrip_ms": 16.2,
-    "max_roundtrip_ms": 18.1,
-    "dropped_stale": 0,
-    "wrong_tick": 0,
-    "bad_lines": 0,
+    "p99_roundtrip_ms": 3.8,
+    "max_roundtrip_ms": 12.7,
     "unit_tests": 7,
-    "platform": "linux/amd64",
-    "cpus": 1,
-    "memory_mb": 512,
-    "swap_mb": 0,
-    "pids": 128,
-    "network": "none",
-    "readonly": true,
-    "uid": "65534:65534",
-    "tmp_mb": 64,
-    "log": "evidence/dualfire-docker-check.log"
+    "profile": {
+      "platform": "linux/amd64",
+      "cpus": 1,
+      "memory_mb": 512,
+      "swap_mb": 0,
+      "pids": 128,
+      "network": "none",
+      "readonly": true,
+      "user": "65534:65534",
+      "tmp_mb": 64
+    }
   },
-  "decision": "Promote the user-confirmed 3.33 dual-fire strategy to main; prior local uncertainty is retained as historical evidence.",
-  "official_candidate_score": 3.33,
-  "official_candidate_sha": "c0e261dde754a55c51ca5ed63a2e9339cfe2802f",
-  "official_candidate_score_source": "User confirmed in follow-up; not independently submitted by agent"
+  "leaderboard_submitted": false,
+  "export_fix": {
+    "failure": "Diagnostic NumPy int64 counter could not be serialized after completed matches",
+    "fix": "Cast diagnostic counters to Python int and float only when writing result",
+    "policy_changed": false,
+    "rerun": "Only missing parts; existing completed parts retained after actor, seed and scenario checks",
+    "measured_runtime_changed": false
+  },
+  "validation_amendment": {
+    "reason": "Observed native late ticks on confirmed baseline during eight-process training load; baseline 6 late vs boost 1. Native timing not judge-isolated. Reserved scores have not been opened.",
+    "eligibility": "No errors/fallback; native late count no worse than baseline. Official checker under judge profile must pass with zero late ticks.",
+    "validation": "Restart both actors from scratch with one worker each, at most two simultaneous matches. Same untouched seeds 1701..1732. Archive all previous high-load reserved results without opening scores.",
+    "candidate": "boost",
+    "retreat_rejected": true,
+    "combination": false
+  }
 }
