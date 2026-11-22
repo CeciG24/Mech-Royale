@@ -97,7 +97,7 @@ DEFAULTS = {
     "duel_hp": 0.5,          # only duel above this HP fraction
     "duel_n": 1,             # duel while at most this many squad mechs were seen in the last 5 s
     "duel_boost": 1,         # boost to close the gap while dueling
-    "surv": 0,               # survival: drift to the next zone centre, fight only when engaged
+    "surv": 1,               # survival: drift to the next zone centre, fight only when engaged
     "w_center": 15.0,        # survival: weight of closeness to the next zone centre
     "surv_dist": 0.3,        # survival: range-keeping weight multiplier
     "surv_fire_r": 100.0,    # survival: hold fire beyond this range unless that mech shot us in the last 8 s
